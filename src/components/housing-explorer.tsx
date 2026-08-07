@@ -50,6 +50,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Slider } from "@/components/ui/slider"
 import { Textarea } from "@/components/ui/textarea"
+import { Toggle } from "@/components/ui/toggle"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
   destination,
@@ -90,6 +91,7 @@ export function HousingExplorer() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedGroceryStore, setSelectedGroceryStore] =
     useState<GroceryStoreSelection | null>(null)
+  const [showTransit, setShowTransit] = useState(false)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [detailTab, setDetailTab] = useState<
     "overview" | "reviews" | "neighborhood"
@@ -201,6 +203,7 @@ export function HousingExplorer() {
       work: WORK_LOCATION,
       selectedHomeId: selectedId,
       winnerId: explorer.winnerId,
+      showTransit,
       showGroceryStores: true,
       selectedGroceryStore,
       isochrone:
@@ -219,6 +222,7 @@ export function HousingExplorer() {
       maxMinutes,
       selectedGroceryStore,
       selectedId,
+      showTransit,
     ]
   )
   const reviewData = selectedHome ? getBuildingReviewData(selectedHome) : null
@@ -457,9 +461,21 @@ export function HousingExplorer() {
                   {modes[activeMode].label.toLowerCase()}
                 </small>
               </div>
-              <Badge>
-                <ActiveModeIcon /> {modes[activeMode].label}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Toggle
+                  variant="outline"
+                  size="sm"
+                  pressed={showTransit}
+                  onPressedChange={setShowTransit}
+                  aria-label="Show CTA trains and buses"
+                >
+                  <BusFront data-icon="inline-start" />
+                  Transit
+                </Toggle>
+                <Badge>
+                  <ActiveModeIcon /> {modes[activeMode].label}
+                </Badge>
+              </div>
             </div>
 
             <AppMap
