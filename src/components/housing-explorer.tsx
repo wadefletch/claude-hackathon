@@ -112,6 +112,7 @@ export function HousingExplorer() {
   >("overview")
   const detailDialogRef = useRef<HTMLDialogElement>(null)
   const detailTriggerRef = useRef<HTMLElement | null>(null)
+  const chatScrollRef = useRef<HTMLDivElement>(null)
   const {
     messages: chatMessages,
     sendMessage: sendChatMessage,
@@ -195,6 +196,15 @@ export function HousingExplorer() {
     if (isDetailOpen && dialog && !dialog.open) dialog.showModal()
   }, [isDetailOpen, selectedId])
 
+  // Keep the chat thread pinned to the latest content — new messages and
+  // streamed tokens both update `chatMessages`, so this fires continuously
+  // while the agent is replying, not just when a full message completes.
+  useEffect(() => {
+    const container = chatScrollRef.current
+    if (!container) return
+    container.scrollTop = container.scrollHeight
+  }, [chatMessages])
+
   const openBuildingDetail = (id: string, trigger: HTMLElement) => {
     detailTriggerRef.current = trigger
     setSelectedId(id)
@@ -220,6 +230,12 @@ export function HousingExplorer() {
   const selectManualMode = (mode: TravelMode) => {
     setManualMode(mode)
     setOptimizer(null)
+  }
+
+  const submitChatMessage = () => {
+    if (!chatInput.trim() || chatStatus === "streaming") return
+    sendChatMessage({ text: chatInput })
+    setChatInput("")
   }
 
   const ActiveModeIcon = modeIcons[activeMode]
@@ -486,7 +502,10 @@ export function HousingExplorer() {
                 Ask about commute, budget, or eligibility
               </p>
 
-              <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
+              <div
+                ref={chatScrollRef}
+                className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4"
+              >
                 {chatMessages.length === 0 && (
                   <div className="flex items-start gap-2">
                     <span
@@ -603,9 +622,7 @@ export function HousingExplorer() {
                 className="grid shrink-0 grid-cols-[1fr_auto] gap-2 border-t p-3"
                 onSubmit={(event) => {
                   event.preventDefault()
-                  if (!chatInput.trim()) return
-                  sendChatMessage({ text: chatInput })
-                  setChatInput("")
+                  submitChatMessage()
                 }}
               >
                 <Label htmlFor="agent-message" className="sr-only">
@@ -616,6 +633,12 @@ export function HousingExplorer() {
                   className="min-h-16 resize-none"
                   value={chatInput}
                   onChange={(event) => setChatInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault()
+                      submitChatMessage()
+                    }
+                  }}
                   placeholder="Message the housing agent"
                   rows={2}
                   disabled={chatStatus === "streaming"}
