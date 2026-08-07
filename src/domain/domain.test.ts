@@ -3,11 +3,15 @@ import { z } from "zod"
 import {
   HOUSING_SODA_URL,
   HousingDevelopment,
+  HousingDetail,
   ProfilePatch,
   UserProfile,
   housingToFeatureCollection,
+  mockHousingDetail,
+  normalizeTransportMode,
   parseSocrataHousing,
   profileJsonSchema,
+  toAppMapLocation,
 } from "./index"
 import { sampleProfile } from "./fixtures/sampleProfile"
 
@@ -72,6 +76,33 @@ describe("parseSocrataHousing", () => {
     expect(fc.features[0].geometry.coordinates).toEqual([
       -87.71287204, 41.93207259,
     ])
+  })
+})
+
+describe("alignment with the UI model (main)", () => {
+  it("maps the UI's legacy transport labels onto our enum", () => {
+    expect(normalizeTransportMode("train")).toBe("transit")
+    expect(normalizeTransportMode("drive")).toBe("car")
+    expect(normalizeTransportMode("rideshare")).toBe("rideshare")
+    expect(normalizeTransportMode("walk")).toBe("walk")
+    expect(normalizeTransportMode("teleport")).toBeNull()
+  })
+
+  it("produces a valid HousingDetail with the UI-shaped review model", () => {
+    const detail = mockHousingDetail("hairpin-lofts-3414-w-diversey-ave")
+    expect(() => HousingDetail.parse(detail)).not.toThrow()
+    expect(detail.reviews?.[0]).toMatchObject({
+      platform: expect.any(String),
+      text: expect.any(String),
+      isMock: true,
+    })
+    expect(detail.sourceSummaries?.length).toBeGreaterThan(0)
+    expect(detail.rentUsd).toBeGreaterThan(0)
+  })
+
+  it("adapts a {lat,lng} into an AppMap [lng,lat] tuple", () => {
+    const loc = toAppMapLocation({ lat: 41.9, lng: -87.7 }, "Home")
+    expect(loc).toEqual({ label: "Home", coordinates: [-87.7, 41.9] })
   })
 })
 

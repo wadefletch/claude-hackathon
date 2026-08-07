@@ -18,6 +18,7 @@ export const Route = z.object({
   mode: TransportMode,
   durationMinutes: z.number(),
   distanceMeters: z.number().optional(),
+  monthlyCostUsd: z.number().optional(), // recurring cost of this mode (fares, gas, rideshare)
   transfers: z.number().optional(), // transit only
   geometry: z.any().optional(), // GeoJSON LineString for drawing on the map
   estimate: z.boolean(), // true = haversine fallback, false = real routing
