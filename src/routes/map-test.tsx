@@ -208,6 +208,7 @@ function MapTestPage() {
         showGroceryStores={showGroceryStores}
         selectedGroceryStore={selectedGroceryStore}
         onGroceryStoreSelect={setSelectedGroceryStore}
+        isochrone={{ mode: "drive", minutes: 30 }}
         className="h-[min(70svh,42rem)] min-h-80"
       />
     </main>

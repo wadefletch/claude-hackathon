@@ -1,9 +1,11 @@
-import { useEffect, useId } from "react"
+import { useEffect, useId, useState } from "react"
+import type { FeatureCollection, Geometry } from "geojson"
 import type { MapLayerMouseEvent } from "maplibre-gl"
 
 import {
   Map,
   MapControls,
+  MapGeoJSON,
   MapMarker,
   MapPopup,
   MapRoute,
@@ -25,6 +27,12 @@ export type GroceryStoreSelection = {
   new_status?: string
 }
 
+export type IsochroneOptions = {
+  mode: "drive" | "transit"
+  minutes: number
+  origin?: AppMapLocation
+}
+
 export type AppMapProps = {
   home: AppMapLocation
   work: AppMapLocation
@@ -33,10 +41,17 @@ export type AppMapProps = {
   showGroceryStores: boolean
   selectedGroceryStore: GroceryStoreSelection | null
   onGroceryStoreSelect: (store: GroceryStoreSelection | null) => void
+  isochrone?: IsochroneOptions
   className?: string
 }
 
 type GroceryStoreProperties = Omit<GroceryStoreSelection, "coordinates">
+type IsochroneData = FeatureCollection<Geometry>
+type GeoapifyIsochroneResponse = IsochroneData & {
+  properties?: { id?: string }
+}
+
+const GEOAPIFY_API_KEY = import.meta.env.VITE_GEOAPIFY_API_KEY
 
 export function AppMap({
   home,
@@ -46,8 +61,41 @@ export function AppMap({
   showGroceryStores,
   selectedGroceryStore,
   onGroceryStoreSelect,
+  isochrone,
   className,
 }: AppMapProps) {
+  const [isochroneData, setIsochroneData] = useState<IsochroneData | null>(null)
+  const isochroneOrigin = isochrone?.origin ?? home
+  const [isochroneLongitude, isochroneLatitude] = isochroneOrigin.coordinates
+  const isochroneMode = isochrone?.mode
+  const isochroneMinutes = isochrone?.minutes
+
+  useEffect(() => {
+    if (!isochroneMode || !isochroneMinutes || !GEOAPIFY_API_KEY) {
+      setIsochroneData(null)
+      return
+    }
+
+    const abortController = new AbortController()
+
+    void fetchIsochrone(
+      [isochroneLongitude, isochroneLatitude],
+      isochroneMode,
+      isochroneMinutes,
+      GEOAPIFY_API_KEY,
+      abortController.signal
+    )
+      .then(setIsochroneData)
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return
+        setIsochroneData(null)
+      })
+
+    return () => abortController.abort()
+  }, [isochroneLatitude, isochroneLongitude, isochroneMinutes, isochroneMode])
+
+  const isochroneColor = isochrone?.mode === "transit" ? "#2563eb" : "#ea580c"
+
   return (
     <section
       className={cn(
@@ -58,6 +106,20 @@ export function AppMap({
     >
       <Map loading={isLoading}>
         <MapControls showCompass showFullscreen />
+        {isochroneData && (
+          <MapGeoJSON
+            id="travel-time-isochrone"
+            data={isochroneData}
+            fillPaint={{
+              "fill-color": isochroneColor,
+              "fill-opacity": 0.2,
+            }}
+            linePaint={{
+              "line-color": isochroneColor,
+              "line-width": 2,
+            }}
+          />
+        )}
         <LocationMarker location={home} type="Home" />
         <LocationMarker location={work} type="Work" />
         {showGroceryStores && (
@@ -78,6 +140,44 @@ export function AppMap({
       </Map>
     </section>
   )
+}
+
+async function fetchIsochrone(
+  [longitude, latitude]: [number, number],
+  mode: IsochroneOptions["mode"],
+  minutes: number,
+  apiKey: string,
+  signal: AbortSignal
+): Promise<IsochroneData> {
+  const params = new URLSearchParams({
+    lat: String(latitude),
+    lon: String(longitude),
+    type: "time",
+    mode,
+    range: String(minutes * 60),
+    apiKey,
+  })
+  let url = `https://api.geoapify.com/v1/isoline?${params}`
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const response = await fetch(url, { signal })
+    const data = (await response.json()) as GeoapifyIsochroneResponse
+
+    if (response.ok && response.status !== 202) return data
+
+    const requestId = data.properties?.id
+    if (response.status !== 202 || !requestId) {
+      throw new Error(`Geoapify returned ${response.status}`)
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, 1000))
+    url = `https://api.geoapify.com/v1/isoline?${new URLSearchParams({
+      id: requestId,
+      apiKey,
+    })}`
+  }
+
+  throw new Error("Geoapify took too long to calculate the isochrone")
 }
 
 function GroceryStoresLayer({

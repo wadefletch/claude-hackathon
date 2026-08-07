@@ -13,6 +13,12 @@ Chicago residents who qualify for subsidized housing have a hard time finding it
 - See reviews pulled from public sources to get a real sense of what living there is like
 - Get routed directly to the right agency to apply
 
+## Isochrone map
+
+Copy `.env.example` to `.env`, add a free Geoapify API key, and restrict the key
+to your local and production origins. `AppMap` accepts an optional `isochrone`
+prop with `mode` (`drive` or `transit`) and `minutes`.
+
 # TanStack Start + shadcn/ui
 
 This is a template for a new TanStack Start project with React, TypeScript, and shadcn/ui.
