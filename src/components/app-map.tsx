@@ -13,6 +13,7 @@ import {
   useMap,
 } from "@/components/ui/map"
 import { TransitLayers } from "@/components/transit-layers"
+import { HandGestureMapControls } from "@/components/hand-gesture-map-controls"
 import { useGeoapifyIsochrone } from "@/hooks/use-geoapify-isochrone"
 import type { IsochroneMode } from "@/hooks/use-geoapify-isochrone"
 import {
@@ -104,6 +105,7 @@ export function AppMap({
     >
       <Map loading={isIsochroneLoading}>
         <MapControls showCompass showFullscreen />
+        <HandGestureMapControls />
         {showTransit && <TransitLayers />}
         {isochroneData && (
           <MapGeoJSON
