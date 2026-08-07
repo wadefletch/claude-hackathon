@@ -49,6 +49,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Slider } from "@/components/ui/slider"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Toggle } from "@/components/ui/toggle"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
@@ -273,8 +274,8 @@ export function HousingExplorer() {
     : `${explorer.results.length} reachable ${explorer.results.length === 1 ? "home" : "homes"}`
 
   return (
-    <main className="min-h-svh bg-background text-foreground">
-      <header className="flex h-16 items-center justify-between border-b bg-background/95 px-4 backdrop-blur sm:px-8 xl:px-10">
+    <main className="min-h-svh bg-background text-foreground lg:flex lg:h-svh lg:flex-col lg:overflow-hidden">
+      <header className="flex h-16 shrink-0 items-center justify-between border-b bg-background/95 px-3 backdrop-blur sm:px-4">
         <a
           className="inline-flex items-center gap-2 text-sm font-medium"
           href="#top"
@@ -291,353 +292,497 @@ export function HousingExplorer() {
         <Badge variant="outline">Chicago, IL</Badge>
       </header>
 
-      <section
-        className="mx-auto w-full max-w-[1800px] px-4 py-8 sm:px-8 xl:px-10"
+      <div
+        className="flex w-full flex-col gap-4 px-3 pt-4 pb-12 sm:px-4 lg:min-h-0 lg:flex-1 lg:flex-row lg:pb-4"
         id="top"
       >
-        <p className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
-          Affordable housing · commute explorer
-        </p>
-        <h1 className="mt-2 text-3xl font-medium tracking-tight sm:text-5xl">
-          Find a home that gets you there.
-        </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-          Compare affordable homes across Chicago by commute time and monthly
-          travel cost.
-        </p>
-      </section>
-
-      <div className="mx-auto grid w-full max-w-[1800px] grid-cols-1 items-start gap-4 px-3 pb-12 sm:px-4 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(560px,1fr)_350px] xl:px-10">
         <aside
-          className="flex flex-col overflow-hidden rounded-xl border bg-card p-4 lg:h-[760px]"
+          className="flex h-[520px] w-full shrink-0 flex-col overflow-hidden rounded-xl border bg-card lg:h-auto lg:w-[380px]"
           aria-label="Housing and commute filters"
         >
-          <div className="flex items-center gap-3 pb-4">
-            <span
-              className="grid size-9 place-items-center rounded-lg bg-muted text-muted-foreground"
-              aria-hidden="true"
-            >
-              <SlidersHorizontal className="size-4" />
-            </span>
-            <div>
-              <p className="text-xs text-muted-foreground">Search controls</p>
-              <h2 className="font-medium">Filters</h2>
-            </div>
-          </div>
+          <Tabs
+            defaultValue="filters"
+            className="flex h-full min-h-0 flex-col gap-0"
+          >
+            <TabsList className="m-3 shrink-0">
+              <TabsTrigger value="filters">
+                <SlidersHorizontal data-icon="inline-start" /> Filters
+              </TabsTrigger>
+              <TabsTrigger value="agent">
+                <Bot data-icon="inline-start" /> Agent
+              </TabsTrigger>
+            </TabsList>
 
-          <section className="py-4" aria-labelledby="destination-label">
-            <h3
-              id="destination-label"
-              className="mb-3 text-xs font-medium text-muted-foreground"
+            <TabsContent
+              value="filters"
+              className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4"
             >
-              Destination
-            </h3>
-            <div
-              className="flex items-center gap-3"
-              aria-label={`Destination: ${workLocation.label}`}
-            >
-              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
-                <MapPin className="size-4" />
-              </span>
-              <strong className="text-sm leading-snug font-medium">
-                {workLocation.label}
-              </strong>
-            </div>
-          </section>
+              <section className="py-4" aria-labelledby="destination-label">
+                <h3
+                  id="destination-label"
+                  className="mb-3 text-xs font-medium text-muted-foreground"
+                >
+                  Destination
+                </h3>
+                <div
+                  className="flex items-center gap-3"
+                  aria-label={`Destination: ${workLocation.label}`}
+                >
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+                    <MapPin className="size-4" />
+                  </span>
+                  <strong className="text-sm leading-snug font-medium">
+                    {workLocation.label}
+                  </strong>
+                </div>
+              </section>
 
-          <Separator />
+              <Separator />
 
-          <section className="py-4" aria-labelledby="commute-label">
-            <div className="mb-3 flex items-center justify-between gap-4 text-sm font-medium">
-              <span
-                id="commute-label"
-                className="inline-flex items-center gap-2"
-              >
-                <Clock3 className="size-4 text-muted-foreground" /> Maximum
-                commute
-              </span>
-              <output className="tabular-nums" aria-live="polite">
-                {maxMinutes} min
-              </output>
-            </div>
-            <Slider
-              aria-label="Maximum commute time in minutes"
-              min={15}
-              max={60}
-              step={5}
-              value={[maxMinutes]}
-              onValueChange={(value) =>
-                setMaxMinutes(Array.isArray(value) ? value[0] : value)
-              }
-            />
-            <div
-              className="mt-2 flex justify-between text-xs text-muted-foreground"
-              aria-hidden="true"
-            >
-              <span>15 min</span>
-              <span>60 min</span>
-            </div>
-          </section>
+              <section className="py-4" aria-labelledby="commute-label">
+                <div className="mb-3 flex items-center justify-between gap-4 text-sm font-medium">
+                  <span
+                    id="commute-label"
+                    className="inline-flex items-center gap-2"
+                  >
+                    <Clock3 className="size-4 text-muted-foreground" /> Maximum
+                    commute
+                  </span>
+                  <output className="tabular-nums" aria-live="polite">
+                    {maxMinutes} min
+                  </output>
+                </div>
+                <Slider
+                  aria-label="Maximum commute time in minutes"
+                  min={15}
+                  max={60}
+                  step={5}
+                  value={[maxMinutes]}
+                  onValueChange={(value) =>
+                    setMaxMinutes(Array.isArray(value) ? value[0] : value)
+                  }
+                />
+                <div
+                  className="mt-2 flex justify-between text-xs text-muted-foreground"
+                  aria-hidden="true"
+                >
+                  <span>15 min</span>
+                  <span>60 min</span>
+                </div>
+              </section>
 
-          <Separator />
+              <Separator />
 
-          <section className="py-4" aria-labelledby="mode-label">
-            <h3
-              id="mode-label"
-              className="mb-3 text-xs font-medium text-muted-foreground"
-            >
-              Travel mode
-            </h3>
-            <ToggleGroup
-              variant="outline"
-              orientation="vertical"
-              spacing={1}
-              aria-label="Travel mode"
-              className="w-full"
-            >
-              {(Object.keys(modes) as TravelMode[]).map((mode) => {
-                const Icon = modeIcons[mode]
-                return (
-                  <ToggleGroupItem
-                    key={mode}
-                    value={mode}
-                    pressed={!optimizer && manualMode === mode}
-                    onPressedChange={(pressed) =>
-                      pressed && selectManualMode(mode)
-                    }
-                    aria-label={`${modes[mode].label}, $${modes[mode].monthlyCost} monthly travel cost`}
+              <section className="py-4" aria-labelledby="mode-label">
+                <h3
+                  id="mode-label"
+                  className="mb-3 text-xs font-medium text-muted-foreground"
+                >
+                  Travel mode
+                </h3>
+                <ToggleGroup
+                  variant="outline"
+                  orientation="vertical"
+                  spacing={1}
+                  aria-label="Travel mode"
+                  className="w-full"
+                >
+                  {(Object.keys(modes) as TravelMode[]).map((mode) => {
+                    const Icon = modeIcons[mode]
+                    return (
+                      <ToggleGroupItem
+                        key={mode}
+                        value={mode}
+                        pressed={!optimizer && manualMode === mode}
+                        onPressedChange={(pressed) =>
+                          pressed && selectManualMode(mode)
+                        }
+                        aria-label={`${modes[mode].label}, $${modes[mode].monthlyCost} monthly travel cost`}
+                        className="w-full justify-start"
+                      >
+                        <Icon data-icon="inline-start" />
+                        <span className="truncate">{modes[mode].label}</span>
+                        <small className="ml-auto truncate text-xs text-muted-foreground">
+                          ${modes[mode].monthlyCost}/mo
+                        </small>
+                      </ToggleGroupItem>
+                    )
+                  })}
+                </ToggleGroup>
+              </section>
+
+              <Separator />
+
+              <section className="py-4" aria-labelledby="optimize-label">
+                <h3
+                  id="optimize-label"
+                  className="mb-3 text-xs font-medium text-muted-foreground"
+                >
+                  Optimize for
+                </h3>
+                <div className="flex flex-col gap-2">
+                  <Button
                     className="w-full justify-start"
+                    variant={optimizer === "cheapest" ? "default" : "outline"}
+                    onClick={() => setOptimizer("cheapest")}
+                    aria-pressed={optimizer === "cheapest"}
                   >
-                    <Icon data-icon="inline-start" />
-                    <span className="truncate">{modes[mode].label}</span>
-                    <small className="ml-auto truncate text-xs text-muted-foreground">
-                      ${modes[mode].monthlyCost}/mo
-                    </small>
-                  </ToggleGroupItem>
-                )
-              })}
-            </ToggleGroup>
-          </section>
-
-          <Separator />
-
-          <section className="py-4" aria-labelledby="optimize-label">
-            <h3
-              id="optimize-label"
-              className="mb-3 text-xs font-medium text-muted-foreground"
-            >
-              Optimize for
-            </h3>
-            <div className="flex flex-col gap-2">
-              <Button
-                className="w-full justify-start"
-                variant={optimizer === "cheapest" ? "default" : "outline"}
-                onClick={() => setOptimizer("cheapest")}
-                aria-pressed={optimizer === "cheapest"}
-              >
-                <DollarSign data-icon="inline-start" /> Cheapest
-              </Button>
-              <Button
-                className="w-full justify-start"
-                variant={optimizer === "quickest" ? "default" : "outline"}
-                onClick={() => setOptimizer("quickest")}
-                aria-pressed={optimizer === "quickest"}
-              >
-                <Sparkles data-icon="inline-start" /> Quickest
-              </Button>
-            </div>
-          </section>
-
-          <Separator />
-
-          <section className="py-4" aria-labelledby="housing-label">
-            <h3
-              id="housing-label"
-              className="mb-3 text-xs font-medium text-muted-foreground"
-            >
-              Housing filters
-            </h3>
-            <div
-              className="flex flex-col gap-2"
-              aria-describedby="future-filters-note"
-            >
-              {["Income eligibility", "Bedrooms", "Availability"].map(
-                (filter) => (
-                  <div
-                    className="flex items-center justify-between rounded-lg border border-dashed p-2 text-sm text-muted-foreground"
-                    key={filter}
+                    <DollarSign data-icon="inline-start" /> Cheapest
+                  </Button>
+                  <Button
+                    className="w-full justify-start"
+                    variant={optimizer === "quickest" ? "default" : "outline"}
+                    onClick={() => setOptimizer("quickest")}
+                    aria-pressed={optimizer === "quickest"}
                   >
-                    <span>{filter}</span>
-                    <Badge variant="outline">Soon</Badge>
+                    <Sparkles data-icon="inline-start" /> Quickest
+                  </Button>
+                </div>
+              </section>
+
+              <Separator />
+
+              <section className="py-4" aria-labelledby="housing-label">
+                <h3
+                  id="housing-label"
+                  className="mb-3 text-xs font-medium text-muted-foreground"
+                >
+                  Housing filters
+                </h3>
+                <div
+                  className="flex flex-col gap-2"
+                  aria-describedby="future-filters-note"
+                >
+                  {["Income eligibility", "Bedrooms", "Availability"].map(
+                    (filter) => (
+                      <div
+                        className="flex items-center justify-between rounded-lg border border-dashed p-2 text-sm text-muted-foreground"
+                        key={filter}
+                      >
+                        <span>{filter}</span>
+                        <Badge variant="outline">Soon</Badge>
+                      </div>
+                    )
+                  )}
+                </div>
+                <p
+                  id="future-filters-note"
+                  className="mt-2 text-xs leading-5 text-muted-foreground"
+                >
+                  More housing criteria will appear here as the search grows.
+                </p>
+              </section>
+            </TabsContent>
+
+            <TabsContent
+              value="agent"
+              className="flex min-h-0 flex-1 flex-col"
+              aria-labelledby="agent-title"
+            >
+              <p
+                id="agent-title"
+                className="shrink-0 px-4 pb-2 text-xs text-muted-foreground"
+              >
+                Ask about commute, budget, or eligibility
+              </p>
+
+              <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
+                {chatMessages.length === 0 && (
+                  <div className="flex items-start gap-2">
+                    <span
+                      className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
+                      aria-hidden="true"
+                    >
+                      <Bot className="size-3" />
+                    </span>
+                    <div className="flex flex-col items-start gap-2">
+                      <p className="rounded-lg bg-muted p-3 text-sm leading-6 text-foreground">
+                        Tell me about your commute, budget, and household — or
+                        check whether you qualify for affordable housing.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={chatStatus === "streaming"}
+                        onClick={() =>
+                          sendChatMessage({ text: "See if I qualify" })
+                        }
+                      >
+                        <SearchCheck data-icon="inline-start" /> See if I
+                        qualify
+                      </Button>
+                    </div>
                   </div>
-                )
-              )}
-            </div>
-            <p
-              id="future-filters-note"
-              className="mt-2 text-xs leading-5 text-muted-foreground"
-            >
-              More housing criteria will appear here as the search grows.
-            </p>
-          </section>
+                )}
+                {chatMessages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={cn(
+                      "flex items-start gap-2",
+                      message.role === "user" && "flex-row-reverse"
+                    )}
+                  >
+                    {message.role === "assistant" && (
+                      <span
+                        className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
+                        aria-hidden="true"
+                      >
+                        <Bot className="size-3" />
+                      </span>
+                    )}
+                    <div className="flex min-w-0 flex-1 flex-col gap-3">
+                      {message.parts.map((part, index) => {
+                        if (part.type === "text") {
+                          return (
+                            <div
+                              key={`${message.id}-${index}`}
+                              className={cn(
+                                "rounded-lg p-3 text-sm",
+                                message.role === "user"
+                                  ? "ml-auto max-w-[85%] bg-primary text-primary-foreground"
+                                  : "max-w-[85%] bg-muted text-foreground"
+                              )}
+                            >
+                              <AgentMarkdown>{part.text}</AgentMarkdown>
+                            </div>
+                          )
+                        }
+                        if (
+                          part.type === "tool-show_map" &&
+                          part.state === "output-available"
+                        ) {
+                          const payload = part.output as ShowMapInput
+                          return (
+                            <div
+                              key={`${message.id}-${index}`}
+                              className="flex flex-col gap-3"
+                            >
+                              {payload.matches.map((match) => {
+                                const workRoute = match.routes.find(
+                                  (route) => route.purpose === "work"
+                                )
+                                return (
+                                  <Card key={match.housing.id}>
+                                    <CardHeader>
+                                      <CardDescription>
+                                        {match.housing.communityArea ??
+                                          match.housing.propertyName}
+                                      </CardDescription>
+                                      <CardTitle className="text-sm">
+                                        {match.housing.address}
+                                      </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="text-sm text-muted-foreground">
+                                      {workRoute && (
+                                        <p>
+                                          {workRoute.durationMinutes} min by{" "}
+                                          {workRoute.mode} to work
+                                        </p>
+                                      )}
+                                      <div className="mt-2">
+                                        <AgentMarkdown>
+                                          {match.rationale}
+                                        </AgentMarkdown>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                )
+                              })}
+                            </div>
+                          )
+                        }
+                        return null
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <form
+                className="grid shrink-0 grid-cols-[1fr_auto] gap-2 border-t p-3"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  if (!chatInput.trim()) return
+                  sendChatMessage({ text: chatInput })
+                  setChatInput("")
+                }}
+              >
+                <Label htmlFor="agent-message" className="sr-only">
+                  Message the housing agent
+                </Label>
+                <Textarea
+                  id="agent-message"
+                  className="min-h-16 resize-none"
+                  value={chatInput}
+                  onChange={(event) => setChatInput(event.target.value)}
+                  placeholder="Message the housing agent"
+                  rows={2}
+                  disabled={chatStatus === "streaming"}
+                />
+                <Button
+                  className="h-16"
+                  type="submit"
+                  disabled={chatStatus === "streaming" || !chatInput.trim()}
+                >
+                  <Send data-icon="inline-start" /> Send
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
         </aside>
 
-        <section
-          className="grid min-w-0 gap-3"
-          aria-label="Housing results and map"
-        >
-          <div className="min-w-0 overflow-hidden rounded-xl border bg-card">
-            <div className="flex h-16 items-center justify-between border-b px-4 text-sm font-medium">
-              <div>
-                <span className="inline-flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-primary ring-4 ring-primary/10" />
-                  Commute area
-                </span>
-                <small className="mt-1 block text-xs font-normal text-muted-foreground">
-                  Within {maxMinutes} minutes by{" "}
-                  {modes[activeMode].label.toLowerCase()}
-                </small>
-              </div>
-              <div className="flex items-center gap-2">
-                <Toggle
-                  variant="outline"
-                  size="sm"
-                  pressed={showTransit}
-                  onPressedChange={setShowTransit}
-                  aria-label="Show CTA trains and buses"
-                >
-                  <BusFront data-icon="inline-start" />
-                  Transit
-                </Toggle>
-                <Badge>
-                  <ActiveModeIcon /> {modes[activeMode].label}
-                </Badge>
-              </div>
+        <div className="flex h-[420px] w-full flex-col overflow-hidden rounded-xl border bg-card lg:h-auto lg:min-w-0 lg:flex-1">
+          <div className="flex h-16 shrink-0 items-center justify-between border-b px-4 text-sm font-medium">
+            <div>
+              <span className="inline-flex items-center gap-2">
+                <span className="size-2 rounded-full bg-primary ring-4 ring-primary/10" />
+                Commute area
+              </span>
+              <small className="mt-1 block text-xs font-normal text-muted-foreground">
+                Within {maxMinutes} minutes by{" "}
+                {modes[activeMode].label.toLowerCase()}
+              </small>
             </div>
-
-            <AppMap
-              className="h-[440px] rounded-none border-0 shadow-none sm:h-[520px] xl:h-[650px]"
-              state={mapState}
-              onHomeSelect={(home, trigger) =>
-                openBuildingDetail(home.id, trigger)
-              }
-              onGroceryStoreSelect={setSelectedGroceryStore}
-            />
-
-            <div
-              className="flex min-h-11 flex-wrap items-center gap-x-5 gap-y-2 border-t px-4 py-2 text-xs text-muted-foreground"
-              aria-label="Map legend"
-            >
-              <span className="inline-flex items-center gap-2">
-                <i className="size-2 rounded-full bg-primary" /> Affordable home
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <i className="size-2 rounded-full bg-amber-600" /> Destination
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <i className="h-1 w-3 rounded-full bg-blue-600" /> CTA routes
-              </span>
+            <div className="flex items-center gap-2">
+              <Toggle
+                variant="outline"
+                size="sm"
+                pressed={showTransit}
+                onPressedChange={setShowTransit}
+                aria-label="Show CTA trains and buses"
+              >
+                <BusFront data-icon="inline-start" />
+                Transit
+              </Toggle>
+              <Badge>
+                <ActiveModeIcon /> {modes[activeMode].label}
+              </Badge>
             </div>
           </div>
 
-          <aside
-            className="min-w-0 overflow-hidden rounded-xl border bg-card"
-            aria-live="polite"
-          >
-            <div className="flex min-h-16 items-center justify-between border-b px-4">
-              <div>
-                <p className="text-xs text-muted-foreground">Matches</p>
-                <h2 className="font-medium">{heading}</h2>
-              </div>
-              <Badge variant="outline">{explorer.results.length}</Badge>
-            </div>
+          <AppMap
+            className="min-h-0 flex-1 rounded-none border-0 shadow-none"
+            state={mapState}
+            onHomeSelect={(home, trigger) =>
+              openBuildingDetail(home.id, trigger)
+            }
+            onGroceryStoreSelect={setSelectedGroceryStore}
+          />
 
-            <div className="flex gap-3 overflow-x-auto p-3">
-              {explorer.results.length ? (
-                explorer.results.map((home) => (
-                  <Card
-                    key={home.id}
-                    className={cn(
-                      "w-[clamp(280px,34vw,340px)] shrink-0 cursor-pointer",
-                      selectedId === home.id && "ring-2 ring-primary"
-                    )}
-                    role="button"
-                    tabIndex={0}
-                    aria-pressed={selectedId === home.id}
-                    onClick={(event) =>
+          <div
+            className="flex min-h-11 shrink-0 flex-wrap items-center gap-x-5 gap-y-2 border-t px-4 py-2 text-xs text-muted-foreground"
+            aria-label="Map legend"
+          >
+            <span className="inline-flex items-center gap-2">
+              <i className="size-2 rounded-full bg-primary" /> Affordable home
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <i className="size-2 rounded-full bg-amber-600" /> Destination
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <i className="h-1 w-3 rounded-full bg-blue-600" /> CTA routes
+            </span>
+          </div>
+        </div>
+
+        <aside
+          className="flex h-[520px] w-full shrink-0 flex-col overflow-hidden rounded-xl border bg-card lg:h-auto lg:w-[380px]"
+          aria-live="polite"
+        >
+          <div className="flex min-h-16 shrink-0 items-center justify-between border-b px-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Matches</p>
+              <h2 className="font-medium">{heading}</h2>
+            </div>
+            <Badge variant="outline">{explorer.results.length}</Badge>
+          </div>
+
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+            {explorer.results.length ? (
+              explorer.results.map((home) => (
+                <Card
+                  key={home.id}
+                  className={cn(
+                    "shrink-0 cursor-pointer",
+                    selectedId === home.id && "ring-2 ring-primary"
+                  )}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={selectedId === home.id}
+                  onClick={(event) =>
+                    openBuildingDetail(home.id, event.currentTarget)
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault()
                       openBuildingDetail(home.id, event.currentTarget)
                     }
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault()
-                        openBuildingDetail(home.id, event.currentTarget)
-                      }
-                    }}
-                  >
-                    <CardHeader>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <CardDescription className="truncate">
-                            {home.neighborhood}
-                          </CardDescription>
-                          <CardTitle>{home.name}</CardTitle>
-                        </div>
-                        {explorer.winnerId === home.id && (
-                          <Badge className="shrink-0">
-                            <Sparkles /> Best match
-                          </Badge>
-                        )}
+                  }}
+                >
+                  <CardHeader>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <CardDescription className="truncate">
+                          {home.neighborhood}
+                        </CardDescription>
+                        <CardTitle>{home.name}</CardTitle>
                       </div>
-                      <CardDescription>{home.address}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <dl className="grid grid-cols-2 divide-x">
-                        <div className="pr-3">
-                          <dt className="text-xs text-muted-foreground">
-                            Monthly rent
-                          </dt>
-                          <dd className="mt-1 font-medium">
-                            ${home.rent.toLocaleString()}
-                          </dd>
-                        </div>
-                        <div className="pl-3">
-                          <dt className="text-xs text-muted-foreground">
-                            Floor plan
-                          </dt>
-                          <dd className="mt-1 font-medium">
-                            {home.beds === 0 ? "Studio" : `${home.beds} bed`}
-                          </dd>
-                        </div>
-                      </dl>
-                    </CardContent>
-                    <CardFooter className="justify-between text-xs text-muted-foreground">
-                      <span className="inline-flex items-center gap-2">
-                        <ActiveModeIcon className="size-4" /> {home.commute} min
-                      </span>
-                      <span>${home.monthlyCost}/mo travel</span>
-                    </CardFooter>
-                  </Card>
-                ))
-              ) : (
-                <Empty className="min-h-56">
-                  <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                      <MapPin />
-                    </EmptyMedia>
-                    <EmptyTitle>No homes in range</EmptyTitle>
-                    <EmptyDescription>
-                      Increase your commute time or try a faster travel mode.
-                    </EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
-              )}
-            </div>
-            <p className="border-t px-4 py-3 text-center text-xs text-muted-foreground">
-              Demo only · All listings, rents, and commute estimates are
-              fictional.
-            </p>
-          </aside>
-        </section>
+                      {explorer.winnerId === home.id && (
+                        <Badge className="shrink-0">
+                          <Sparkles /> Best match
+                        </Badge>
+                      )}
+                    </div>
+                    <CardDescription>{home.address}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <dl className="grid grid-cols-2 divide-x">
+                      <div className="pr-3">
+                        <dt className="text-xs text-muted-foreground">
+                          Monthly rent
+                        </dt>
+                        <dd className="mt-1 font-medium">
+                          ${home.rent.toLocaleString()}
+                        </dd>
+                      </div>
+                      <div className="pl-3">
+                        <dt className="text-xs text-muted-foreground">
+                          Floor plan
+                        </dt>
+                        <dd className="mt-1 font-medium">
+                          {home.beds === 0 ? "Studio" : `${home.beds} bed`}
+                        </dd>
+                      </div>
+                    </dl>
+                  </CardContent>
+                  <CardFooter className="justify-between text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-2">
+                      <ActiveModeIcon className="size-4" /> {home.commute} min
+                    </span>
+                    <span>${home.monthlyCost}/mo travel</span>
+                  </CardFooter>
+                </Card>
+              ))
+            ) : (
+              <Empty className="min-h-56">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <MapPin />
+                  </EmptyMedia>
+                  <EmptyTitle>No homes in range</EmptyTitle>
+                  <EmptyDescription>
+                    Increase your commute time or try a faster travel mode.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
+          </div>
+          <p className="shrink-0 border-t px-4 py-3 text-center text-xs text-muted-foreground">
+            Demo only · All listings, rents, and commute estimates are
+            fictional.
+          </p>
+        </aside>
 
         {isDetailOpen && selectedHome && reviewData && neighborhoodData && (
           <dialog
@@ -1063,174 +1208,6 @@ export function HousingExplorer() {
             </section>
           </dialog>
         )}
-
-        <aside
-          className="flex h-[480px] flex-col overflow-hidden rounded-xl border bg-card lg:col-span-2 xl:sticky xl:top-4 xl:col-span-1 xl:h-[760px]"
-          aria-labelledby="agent-title"
-        >
-          <header className="flex items-center gap-3 border-b p-4">
-            <span
-              className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
-              aria-hidden="true"
-            >
-              <Bot className="size-4" />
-            </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 id="agent-title" className="text-sm font-medium">
-                  Housing agent
-                </h2>
-                <span
-                  className="size-2 rounded-full bg-muted-foreground/50"
-                  aria-hidden="true"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Ask about commute, budget, or eligibility
-              </p>
-            </div>
-          </header>
-
-          <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-            {chatMessages.length === 0 && (
-              <div className="flex items-start gap-2">
-                <span
-                  className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
-                  aria-hidden="true"
-                >
-                  <Bot className="size-3" />
-                </span>
-                <div className="flex flex-col items-start gap-2">
-                  <p className="rounded-lg bg-muted p-3 text-sm leading-6 text-foreground">
-                    Tell me about your commute, budget, and household — or
-                    check whether you qualify for affordable housing.
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={chatStatus === "streaming"}
-                    onClick={() => sendChatMessage({ text: "See if I qualify" })}
-                  >
-                    <SearchCheck data-icon="inline-start" /> See if I qualify
-                  </Button>
-                </div>
-              </div>
-            )}
-            {chatMessages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  "flex items-start gap-2",
-                  message.role === "user" && "flex-row-reverse"
-                )}
-              >
-                {message.role === "assistant" && (
-                  <span
-                    className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
-                    aria-hidden="true"
-                  >
-                    <Bot className="size-3" />
-                  </span>
-                )}
-                <div className="flex min-w-0 flex-1 flex-col gap-3">
-                  {message.parts.map((part, index) => {
-                    if (part.type === "text") {
-                      return (
-                        <div
-                          key={`${message.id}-${index}`}
-                          className={cn(
-                            "rounded-lg p-3 text-sm",
-                            message.role === "user"
-                              ? "ml-auto max-w-[85%] bg-primary text-primary-foreground"
-                              : "max-w-[85%] bg-muted text-foreground"
-                          )}
-                        >
-                          <AgentMarkdown>{part.text}</AgentMarkdown>
-                        </div>
-                      )
-                    }
-                    if (
-                      part.type === "tool-show_map" &&
-                      part.state === "output-available"
-                    ) {
-                      const payload = part.output as ShowMapInput
-                      return (
-                        <div
-                          key={`${message.id}-${index}`}
-                          className="flex flex-col gap-3"
-                        >
-                          {payload.matches.map((match) => {
-                            const workRoute = match.routes.find(
-                              (route) => route.purpose === "work"
-                            )
-                            return (
-                              <Card key={match.housing.id}>
-                                <CardHeader>
-                                  <CardDescription>
-                                    {match.housing.communityArea ??
-                                      match.housing.propertyName}
-                                  </CardDescription>
-                                  <CardTitle className="text-sm">
-                                    {match.housing.address}
-                                  </CardTitle>
-                                </CardHeader>
-                                <CardContent className="text-sm text-muted-foreground">
-                                  {workRoute && (
-                                    <p>
-                                      {workRoute.durationMinutes} min by{" "}
-                                      {workRoute.mode} to work
-                                    </p>
-                                  )}
-                                  <div className="mt-2">
-                                    <AgentMarkdown>
-                                      {match.rationale}
-                                    </AgentMarkdown>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            )
-                          })}
-                        </div>
-                      )
-                    }
-                    return null
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <form
-            className="grid grid-cols-[1fr_auto] gap-2 border-t p-3"
-            onSubmit={(event) => {
-              event.preventDefault()
-              if (!chatInput.trim()) return
-              sendChatMessage({ text: chatInput })
-              setChatInput("")
-            }}
-          >
-            <Label htmlFor="agent-message" className="sr-only">
-              Message the housing agent
-            </Label>
-            <Textarea
-              id="agent-message"
-              className="min-h-16 resize-none"
-              value={chatInput}
-              onChange={(event) => setChatInput(event.target.value)}
-              placeholder="Message the housing agent"
-              rows={2}
-              disabled={chatStatus === "streaming"}
-            />
-            <Button
-              className="h-16"
-              type="submit"
-              disabled={chatStatus === "streaming" || !chatInput.trim()}
-            >
-              <Send data-icon="inline-start" /> Send
-            </Button>
-          </form>
-        </aside>
       </div>
     </main>
   )
