@@ -62,6 +62,8 @@ import type { Optimizer, TravelMode } from "@/lib/housing-data"
 import { getBuildingReviewData } from "@/lib/building-reviews"
 import { getNeighborhoodSnapshot } from "@/lib/neighborhood-data"
 import type { ShowMapInput } from "@/lib/agent/schemas"
+import type { TransportMode } from "@/domain"
+import { AgentMarkdown } from "@/components/agent-markdown"
 import { cn } from "@/lib/utils"
 
 const modeIcons = {
@@ -71,15 +73,26 @@ const modeIcons = {
   rideshare: Navigation,
 } satisfies Record<TravelMode, typeof TrainFront>
 
-const WORK_LOCATION = {
+const DEFAULT_WORK_LOCATION = {
   label: destination,
   coordinates: [-87.633, 41.882] as [number, number],
+}
+
+// The agent's TransportMode is a superset of this demo's TravelMode (no
+// "bike" here, so it falls back to "walk" as the closest non-motorized mode).
+const AGENT_MODE_TO_TRAVEL_MODE: Record<TransportMode, TravelMode> = {
+  transit: "train",
+  car: "drive",
+  walk: "walk",
+  bike: "walk",
+  rideshare: "rideshare",
 }
 
 export function HousingExplorer() {
   const [maxMinutes, setMaxMinutes] = useState(35)
   const [manualMode, setManualMode] = useState<TravelMode>("train")
   const [optimizer, setOptimizer] = useState<Optimizer | null>(null)
+  const [workLocation, setWorkLocation] = useState(DEFAULT_WORK_LOCATION)
   const explorer = useMemo(
     () =>
       optimizer
@@ -139,6 +152,29 @@ export function HousingExplorer() {
       replace: true,
     })
   }, [latestShowMapOutput, navigate])
+
+  // Reflect what the agent learned in the sidebar's own filter controls, so a
+  // conversation like "I work at 200 W Madison and take the train" visibly
+  // updates Destination/Maximum commute/Travel mode instead of only showing
+  // up in the chat thread. Note: this syncs the *filter controls* — the
+  // sidebar's home listings still come from the separate demo dataset, not
+  // from the agent's own search results (those render inline in the chat).
+  useEffect(() => {
+    const profile = latestShowMapOutput?.profile
+    const workingMember = profile?.members.find((member) => member.work)
+    const work = workingMember?.work
+    if (!work) return
+
+    setManualMode(AGENT_MODE_TO_TRAVEL_MODE[work.preferredMode])
+    setOptimizer(null)
+    if (work.maxCommuteMinutes) {
+      setMaxMinutes(work.maxCommuteMinutes)
+    }
+    setWorkLocation({
+      label: work.label ?? work.address ?? DEFAULT_WORK_LOCATION.label,
+      coordinates: [work.lng, work.lat],
+    })
+  }, [latestShowMapOutput])
 
   useEffect(() => {
     if (explorer.results.some((home) => home.id === selectedId)) return
@@ -200,7 +236,7 @@ export function HousingExplorer() {
   const mapState = useMemo<AppMapState>(
     () => ({
       homes: mapHomes,
-      work: WORK_LOCATION,
+      work: workLocation,
       selectedHomeId: selectedId,
       winnerId: explorer.winnerId,
       showTransit,
@@ -210,7 +246,7 @@ export function HousingExplorer() {
         activeMode === "walk"
           ? undefined
           : {
-              origin: WORK_LOCATION,
+              origin: workLocation,
               mode: activeMode === "train" ? "transit" : "drive",
               minutes: maxMinutes,
             },
@@ -223,6 +259,7 @@ export function HousingExplorer() {
       selectedGroceryStore,
       selectedId,
       showTransit,
+      workLocation,
     ]
   )
   const reviewData = selectedHome ? getBuildingReviewData(selectedHome) : null
@@ -297,13 +334,13 @@ export function HousingExplorer() {
             </h3>
             <div
               className="flex items-center gap-3"
-              aria-label={`Destination: ${destination}`}
+              aria-label={`Destination: ${workLocation.label}`}
             >
               <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
                 <MapPin className="size-4" />
               </span>
               <strong className="text-sm leading-snug font-medium">
-                {destination}
+                {workLocation.label}
               </strong>
             </div>
           </section>
@@ -1063,7 +1100,7 @@ export function HousingExplorer() {
                 >
                   <Bot className="size-3" />
                 </span>
-                <p className="rounded-lg bg-muted p-3 text-sm leading-6 text-muted-foreground">
+                <p className="rounded-lg bg-muted p-3 text-sm leading-6 text-foreground">
                   Tell me about your commute, budget, and household — or ask
                   &ldquo;see if I qualify&rdquo; to check affordable housing
                   eligibility.
@@ -1090,17 +1127,17 @@ export function HousingExplorer() {
                   {message.parts.map((part, index) => {
                     if (part.type === "text") {
                       return (
-                        <p
+                        <div
                           key={`${message.id}-${index}`}
                           className={cn(
-                            "rounded-lg p-3 text-sm leading-6",
+                            "rounded-lg p-3 text-sm",
                             message.role === "user"
                               ? "ml-auto max-w-[85%] bg-primary text-primary-foreground"
-                              : "max-w-[85%] bg-muted text-muted-foreground"
+                              : "max-w-[85%] bg-muted text-foreground"
                           )}
                         >
-                          {part.text}
-                        </p>
+                          <AgentMarkdown>{part.text}</AgentMarkdown>
+                        </div>
                       )
                     }
                     if (
@@ -1135,9 +1172,11 @@ export function HousingExplorer() {
                                       {workRoute.mode} to work
                                     </p>
                                   )}
-                                  <p className="mt-2 leading-6">
-                                    {match.rationale}
-                                  </p>
+                                  <div className="mt-2">
+                                    <AgentMarkdown>
+                                      {match.rationale}
+                                    </AgentMarkdown>
+                                  </div>
                                 </CardContent>
                               </Card>
                             )
