@@ -238,7 +238,7 @@ export function HousingExplorer() {
 
   return (
     <main className="min-h-svh bg-background text-foreground lg:flex lg:h-svh lg:flex-col lg:overflow-hidden">
-      <header className="flex h-16 shrink-0 items-center justify-between border-b bg-background/95 px-4 backdrop-blur sm:px-8 xl:px-10">
+      <header className="flex h-16 shrink-0 items-center justify-between border-b bg-background/95 px-3 backdrop-blur sm:px-4">
         <a
           className="inline-flex items-center gap-2 text-sm font-medium"
           href="#top"
@@ -256,7 +256,7 @@ export function HousingExplorer() {
       </header>
 
       <div
-        className="mx-auto flex w-full max-w-[1800px] flex-col gap-4 px-3 pt-4 pb-12 sm:px-4 lg:min-h-0 lg:flex-1 lg:flex-row lg:pb-4 xl:px-10"
+        className="flex w-full flex-col gap-4 px-3 pt-4 pb-12 sm:px-4 lg:min-h-0 lg:flex-1 lg:flex-row lg:pb-4"
         id="top"
       >
         <aside
