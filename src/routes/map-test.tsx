@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 
 export const Route = createFileRoute("/map-test")({
   component: MapTestPage,
@@ -94,6 +95,7 @@ function MapTestPage() {
   const [routeError, setRouteError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [showGroceryStores, setShowGroceryStores] = useState(true)
+  const [showIsochrone, setShowIsochrone] = useState(false)
   const [selectedGroceryStore, setSelectedGroceryStore] =
     useState<GroceryStoreSelection | null>(null)
 
@@ -183,16 +185,28 @@ function MapTestPage() {
         />
       </FieldGroup>
 
-      <Field orientation="horizontal" className="w-fit">
-        <Checkbox
-          id="show-grocery-stores"
-          checked={showGroceryStores}
-          onCheckedChange={handleGroceryStoresChange}
-        />
-        <FieldLabel htmlFor="show-grocery-stores">
-          Show grocery stores
-        </FieldLabel>
-      </Field>
+      <FieldGroup className="flex flex-row flex-wrap gap-4">
+        <Field orientation="horizontal" className="w-fit">
+          <Checkbox
+            id="show-grocery-stores"
+            checked={showGroceryStores}
+            onCheckedChange={handleGroceryStoresChange}
+          />
+          <FieldLabel htmlFor="show-grocery-stores">
+            Show grocery stores
+          </FieldLabel>
+        </Field>
+        <Field orientation="horizontal" className="w-fit">
+          <Switch
+            id="show-isochrone"
+            checked={showIsochrone}
+            onCheckedChange={setShowIsochrone}
+          />
+          <FieldLabel htmlFor="show-isochrone">
+            Show 30-minute drive area from home
+          </FieldLabel>
+        </Field>
+      </FieldGroup>
 
       <p className="min-h-5 text-sm text-muted-foreground" role="status">
         {isLoading && "Calculating route…"}
@@ -208,6 +222,7 @@ function MapTestPage() {
         showGroceryStores={showGroceryStores}
         selectedGroceryStore={selectedGroceryStore}
         onGroceryStoreSelect={setSelectedGroceryStore}
+        isochrone={showIsochrone ? { mode: "drive", minutes: 30 } : undefined}
         className="h-[min(70svh,42rem)] min-h-80"
       />
     </main>

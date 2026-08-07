@@ -4,6 +4,7 @@ import type { MapLayerMouseEvent } from "maplibre-gl"
 import {
   Map,
   MapControls,
+  MapGeoJSON,
   MapMarker,
   MapPopup,
   MapRoute,
@@ -11,6 +12,8 @@ import {
   MarkerLabel,
   useMap,
 } from "@/components/ui/map"
+import { useGeoapifyIsochrone } from "@/hooks/use-geoapify-isochrone"
+import type { IsochroneMode } from "@/hooks/use-geoapify-isochrone"
 import { cn } from "@/lib/utils"
 
 export type AppMapLocation = {
@@ -25,6 +28,12 @@ export type GroceryStoreSelection = {
   new_status?: string
 }
 
+export type IsochroneOptions = {
+  mode: IsochroneMode
+  minutes: number
+  origin?: AppMapLocation
+}
+
 export type AppMapProps = {
   home: AppMapLocation
   work: AppMapLocation
@@ -33,6 +42,7 @@ export type AppMapProps = {
   showGroceryStores: boolean
   selectedGroceryStore: GroceryStoreSelection | null
   onGroceryStoreSelect: (store: GroceryStoreSelection | null) => void
+  isochrone?: IsochroneOptions
   className?: string
 }
 
@@ -46,8 +56,23 @@ export function AppMap({
   showGroceryStores,
   selectedGroceryStore,
   onGroceryStoreSelect,
+  isochrone,
   className,
 }: AppMapProps) {
+  const isochroneOrigin = isochrone?.origin ?? home
+  const { data: isochroneData, isFetching: isIsochroneLoading } =
+    useGeoapifyIsochrone(
+      isochrone
+        ? {
+            coordinates: isochroneOrigin.coordinates,
+            mode: isochrone.mode,
+            minutes: isochrone.minutes,
+          }
+        : undefined
+    )
+
+  const isochroneColor = isochrone?.mode === "transit" ? "#2563eb" : "#ea580c"
+
   return (
     <section
       className={cn(
@@ -56,8 +81,22 @@ export function AppMap({
       )}
       aria-label={`Driving route from ${home.label} to ${work.label}`}
     >
-      <Map loading={isLoading}>
+      <Map loading={isLoading || isIsochroneLoading}>
         <MapControls showCompass showFullscreen />
+        {isochroneData && (
+          <MapGeoJSON
+            id="travel-time-isochrone"
+            data={isochroneData}
+            fillPaint={{
+              "fill-color": isochroneColor,
+              "fill-opacity": 0.2,
+            }}
+            linePaint={{
+              "line-color": isochroneColor,
+              "line-width": 2,
+            }}
+          />
+        )}
         <LocationMarker location={home} type="Home" />
         <LocationMarker location={work} type="Work" />
         {showGroceryStores && (
