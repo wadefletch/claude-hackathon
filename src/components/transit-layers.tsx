@@ -27,7 +27,21 @@ const CTA_ATTRIBUTION =
 function getFirstLabelLayer(
   map: NonNullable<ReturnType<typeof useMap>["map"]>
 ) {
-  return map.getStyle().layers.find((layer) => layer.type === "symbol")?.id
+  const layers = map.getStyle().layers
+
+  // The basemap interleaves a few early symbol layers (waterway labels) with
+  // geometry, so the *first* symbol layer sits underneath roads, rail and
+  // buildings — anything inserted there disappears as those layers fade in on
+  // zoom. Anchor to the first symbol layer that follows all basemap geometry
+  // instead, which keeps transit above the streets but below place labels.
+  let lastGeometryIndex = -1
+  for (let i = 0; i < layers.length; i++) {
+    if (layers[i].type !== "symbol") lastGeometryIndex = i
+  }
+
+  return layers.find(
+    (layer, index) => layer.type === "symbol" && index > lastGeometryIndex
+  )?.id
 }
 
 function chicagoGeoJson(datasetId: string, fields: string[]) {

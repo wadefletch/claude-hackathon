@@ -24,11 +24,7 @@ import {
 } from "lucide-react"
 
 import { AppMap } from "@/components/app-map"
-import type {
-  AppMapHome,
-  AppMapState,
-  GroceryStoreSelection,
-} from "@/components/app-map"
+import type { AppMapHome, AppMapState } from "@/components/app-map"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -46,6 +42,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   ResizableHandle,
@@ -56,9 +53,9 @@ import { Separator } from "@/components/ui/separator"
 import { Slider } from "@/components/ui/slider"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Toggle } from "@/components/ui/toggle"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
+  buildHomesFromDevelopments,
   destination,
   getManualResults,
   getOptimizedResults,
@@ -68,7 +65,12 @@ import type { Optimizer, TravelMode } from "@/lib/housing-data"
 import { getBuildingReviewData } from "@/lib/building-reviews"
 import { getNeighborhoodSnapshot } from "@/lib/neighborhood-data"
 import type { ShowMapInput } from "@/lib/agent/schemas"
-import type { ProfilePatch, TransportMode, WorkLocation } from "@/domain"
+import type {
+  HousingDevelopment,
+  ProfilePatch,
+  TransportMode,
+  WorkLocation,
+} from "@/domain"
 import { AgentMarkdown } from "@/components/agent-markdown"
 import { cn } from "@/lib/utils"
 
@@ -94,23 +96,44 @@ const AGENT_MODE_TO_TRAVEL_MODE: Record<TransportMode, TravelMode> = {
   rideshare: "rideshare",
 }
 
-export function HousingExplorer() {
-  const [maxMinutes, setMaxMinutes] = useState(35)
+export function HousingExplorer({
+  developments,
+}: {
+  developments: HousingDevelopment[]
+}) {
+  const [maxMinutes, setMaxMinutes] = useState(20)
   const [manualMode, setManualMode] = useState<TravelMode>("train")
   const [optimizer, setOptimizer] = useState<Optimizer | null>(null)
   const [workLocation, setWorkLocation] = useState(DEFAULT_WORK_LOCATION)
+  const [monthlyIncome, setMonthlyIncome] = useState(3600)
+  const [bedsNeeded, setBedsNeeded] = useState(0)
+  const [focusedNeighborhood, setFocusedNeighborhood] = useState<string | null>(
+    null
+  )
+  const realHomes = useMemo(
+    () => buildHomesFromDevelopments(developments),
+    [developments]
+  )
+  // Left-panel eligibility filters narrow the set before commute filtering:
+  // rent-to-income ≤ 30% (the affordability test) and enough bedrooms.
+  const eligibleHomes = useMemo(
+    () =>
+      realHomes.filter(
+        (home) =>
+          (monthlyIncome <= 0 || home.rent / monthlyIncome <= 0.3) &&
+          home.beds >= bedsNeeded
+      ),
+    [realHomes, monthlyIncome, bedsNeeded]
+  )
   const explorer = useMemo(
     () =>
       optimizer
-        ? getOptimizedResults(optimizer, maxMinutes)
-        : getManualResults(manualMode, maxMinutes),
-    [manualMode, maxMinutes, optimizer]
+        ? getOptimizedResults(optimizer, maxMinutes, eligibleHomes)
+        : getManualResults(manualMode, maxMinutes, eligibleHomes),
+    [manualMode, maxMinutes, optimizer, eligibleHomes]
   )
   const activeMode = explorer.mode
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [selectedGroceryStore, setSelectedGroceryStore] =
-    useState<GroceryStoreSelection | null>(null)
-  const [showTransit, setShowTransit] = useState(false)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [detailTab, setDetailTab] = useState<
     "overview" | "reviews" | "neighborhood"
@@ -222,10 +245,6 @@ export function HousingExplorer() {
   }, [explorer])
 
   useEffect(() => {
-    setSelectedGroceryStore(null)
-  }, [activeMode, maxMinutes])
-
-  useEffect(() => {
     const dialog = detailDialogRef.current
     if (isDetailOpen && dialog && !dialog.open) dialog.showModal()
   }, [isDetailOpen, selectedId])
@@ -284,15 +303,44 @@ export function HousingExplorer() {
       })),
     [explorer.results]
   )
+  // Aggregate the reachable homes into one bubble per community area (centroid
+  // + count) for the zoomed-out hybrid map view.
+  const neighborhoodGroups = useMemo(() => {
+    const groups = new Map<
+      string,
+      { sumLng: number; sumLat: number; count: number; homeIds: string[] }
+    >()
+    for (const home of explorer.results) {
+      const name = home.neighborhood || "Chicago"
+      const group = groups.get(name) ?? {
+        sumLng: 0,
+        sumLat: 0,
+        count: 0,
+        homeIds: [],
+      }
+      group.sumLng += home.coordinates[0]
+      group.sumLat += home.coordinates[1]
+      group.count += 1
+      group.homeIds.push(home.id)
+      groups.set(name, group)
+    }
+    return [...groups.entries()].map(([name, group]) => ({
+      name,
+      coordinates: [group.sumLng / group.count, group.sumLat / group.count] as [
+        number,
+        number,
+      ],
+      count: group.count,
+      homeIds: group.homeIds,
+    }))
+  }, [explorer.results])
   const mapState = useMemo<AppMapState>(
     () => ({
       homes: mapHomes,
+      neighborhoodGroups,
       work: workLocation,
       selectedHomeId: selectedId,
       winnerId: explorer.winnerId,
-      showTransit,
-      showGroceryStores: true,
-      selectedGroceryStore,
       isochrone: {
         origin: workLocation,
         mode:
@@ -308,22 +356,42 @@ export function HousingExplorer() {
       activeMode,
       explorer.winnerId,
       mapHomes,
+      neighborhoodGroups,
       maxMinutes,
-      selectedGroceryStore,
       selectedId,
-      showTransit,
       workLocation,
     ]
   )
   const reviewData = selectedHome ? getBuildingReviewData(selectedHome) : null
   const neighborhoodData = selectedHome
-    ? getNeighborhoodSnapshot(selectedHome.id)
+    ? getNeighborhoodSnapshot(selectedHome.id, selectedHome.neighborhood)
     : null
+
+  // Clicking a neighborhood bubble focuses the Matches list on that group.
+  // Drop focus if a filter change removed the neighborhood from the results.
+  useEffect(() => {
+    if (
+      focusedNeighborhood &&
+      !explorer.results.some(
+        (home) => home.neighborhood === focusedNeighborhood
+      )
+    ) {
+      setFocusedNeighborhood(null)
+    }
+  }, [explorer.results, focusedNeighborhood])
+
+  const displayedResults = focusedNeighborhood
+    ? explorer.results.filter(
+        (home) => home.neighborhood === focusedNeighborhood
+      )
+    : explorer.results
   const heading = optimizer
     ? optimizer === "cheapest"
       ? "Best value match"
       : "Fastest match"
-    : `${explorer.results.length} reachable ${explorer.results.length === 1 ? "home" : "homes"}`
+    : focusedNeighborhood
+      ? focusedNeighborhood
+      : `${explorer.results.length} reachable ${explorer.results.length === 1 ? "home" : "homes"}`
 
   return (
     <main className="flex h-svh min-h-svh flex-col overflow-hidden bg-background text-foreground">
@@ -506,29 +574,68 @@ export function HousingExplorer() {
                     >
                       Housing filters
                     </h3>
-                    <div
-                      className="flex flex-col gap-2"
-                      aria-describedby="future-filters-note"
-                    >
-                      {["Income eligibility", "Bedrooms", "Availability"].map(
-                        (filter) => (
-                          <div
-                            className="flex items-center justify-between rounded-lg border border-dashed p-2 text-sm text-muted-foreground"
-                            key={filter}
-                          >
-                            <span>{filter}</span>
-                            <Badge variant="outline">Soon</Badge>
-                          </div>
-                        )
-                      )}
+                    <div className="flex flex-col gap-4">
+                      <div>
+                        <Label
+                          htmlFor="income"
+                          className="mb-2 inline-flex items-center gap-2 text-sm font-medium"
+                        >
+                          <DollarSign className="size-4 text-muted-foreground" />{" "}
+                          Monthly income
+                        </Label>
+                        <Input
+                          id="income"
+                          type="number"
+                          min={0}
+                          step={100}
+                          value={monthlyIncome || ""}
+                          onChange={(event) =>
+                            setMonthlyIncome(Number(event.target.value) || 0)
+                          }
+                        />
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {monthlyIncome > 0
+                            ? `Shows homes with rent ≤ $${Math.round(
+                                monthlyIncome * 0.3
+                              ).toLocaleString()}/mo (30% of income).`
+                            : "Enter income to filter by affordability."}
+                        </p>
+                      </div>
+
+                      <div>
+                        <h4 className="mb-2 text-sm font-medium">Bedrooms</h4>
+                        <ToggleGroup
+                          variant="outline"
+                          spacing={1}
+                          aria-label="Minimum bedrooms"
+                          className="w-full"
+                        >
+                          {[
+                            { value: 0, label: "Any" },
+                            { value: 1, label: "1+" },
+                            { value: 2, label: "2+" },
+                            { value: 3, label: "3+" },
+                          ].map((option) => (
+                            <ToggleGroupItem
+                              key={option.value}
+                              value={String(option.value)}
+                              pressed={bedsNeeded === option.value}
+                              onPressedChange={(pressed) =>
+                                pressed && setBedsNeeded(option.value)
+                              }
+                              className="flex-1"
+                            >
+                              {option.label}
+                            </ToggleGroupItem>
+                          ))}
+                        </ToggleGroup>
+                      </div>
+
+                      <div className="flex items-center justify-between rounded-lg border border-dashed p-2 text-sm text-muted-foreground">
+                        <span>Availability</span>
+                        <Badge variant="outline">Soon</Badge>
+                      </div>
                     </div>
-                    <p
-                      id="future-filters-note"
-                      className="mt-2 text-xs leading-5 text-muted-foreground"
-                    >
-                      More housing criteria will appear here as the search
-                      grows.
-                    </p>
                   </section>
                 </TabsContent>
 
@@ -717,16 +824,6 @@ export function HousingExplorer() {
                   </small>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Toggle
-                    variant="outline"
-                    size="sm"
-                    pressed={showTransit}
-                    onPressedChange={setShowTransit}
-                    aria-label="Show CTA trains and buses"
-                  >
-                    <BusFront data-icon="inline-start" />
-                    Transit
-                  </Toggle>
                   <Badge>
                     <ActiveModeIcon /> {modes[activeMode].label}
                   </Badge>
@@ -739,7 +836,7 @@ export function HousingExplorer() {
                 onHomeSelect={(home, trigger) =>
                   openBuildingDetail(home.id, trigger)
                 }
-                onGroceryStoreSelect={setSelectedGroceryStore}
+                onNeighborhoodSelect={setFocusedNeighborhood}
               />
 
               <div
@@ -774,14 +871,26 @@ export function HousingExplorer() {
               <div className="flex min-h-16 shrink-0 items-center justify-between border-b px-4">
                 <div>
                   <p className="text-xs text-muted-foreground">Matches</p>
-                  <h2 className="font-medium">{heading}</h2>
+                  <h2 className="flex items-center gap-2 font-medium">
+                    {heading}
+                    {focusedNeighborhood && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 gap-1 px-2 text-xs"
+                        onClick={() => setFocusedNeighborhood(null)}
+                      >
+                        Clear <X className="size-3" />
+                      </Button>
+                    )}
+                  </h2>
                 </div>
-                <Badge variant="outline">{explorer.results.length}</Badge>
+                <Badge variant="outline">{displayedResults.length}</Badge>
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-                {explorer.results.length ? (
-                  explorer.results.map((home) => (
+                {displayedResults.length ? (
+                  displayedResults.map((home) => (
                     <Card
                       key={home.id}
                       className={cn(

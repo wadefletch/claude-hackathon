@@ -301,6 +301,33 @@ export const neighborhoodSnapshots: Record<string, NeighborhoodSnapshot> = {
   },
 }
 
-export function getNeighborhoodSnapshot(homeId: string) {
-  return neighborhoodSnapshots[homeId]
+export function getNeighborhoodSnapshot(
+  homeId: string,
+  neighborhoodName?: string
+): NeighborhoodSnapshot {
+  return (
+    neighborhoodSnapshots[homeId] ??
+    fallbackSnapshot(neighborhoodName ?? "This area")
+  )
+}
+
+// Real Chicago developments fall outside the 16 curated neighborhoods; return a
+// generic-but-valid snapshot so the detail dialog always has content to render.
+function fallbackSnapshot(name: string): NeighborhoodSnapshot {
+  return {
+    overview: `${name} is a Chicago community area with a mix of residential blocks, local businesses, and access to city services. Detailed neighborhood data isn't available for this building yet.`,
+    transit: [
+      "CTA bus and rail service across the city",
+      "Check the CTA trip planner for nearby stops",
+    ],
+    essentials: [
+      "Neighborhood grocery and retail options",
+      "Nearby parks and public services",
+      "Local Chicago Public Library branch",
+    ],
+    facts: [
+      { label: "Setting", value: "Chicago community area" },
+      { label: "Data", value: "Generated placeholder" },
+    ],
+  }
 }
