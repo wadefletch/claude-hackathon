@@ -43,8 +43,6 @@ export function HousingExplorer() {
   const [maxMinutes, setMaxMinutes] = useState(35)
   const [manualMode, setManualMode] = useState<TravelMode>("train")
   const [optimizer, setOptimizer] = useState<Optimizer | null>(null)
-  const [reviewWants, setReviewWants] = useState("")
-  const [reviewAvoids, setReviewAvoids] = useState("")
   const explorer = useMemo(
     () =>
       optimizer
@@ -242,40 +240,6 @@ export function HousingExplorer() {
             </p>
           </section>
 
-          <Separator />
-
-          <section
-            className="filter-section review-preferences"
-            aria-labelledby="reviews-label"
-          >
-            <h3 id="reviews-label" className="control-label">
-              Review preferences
-            </h3>
-            <p id="reviews-help" className="helper-copy">
-              Tell the future housing agent which signals to look for while
-              reading resident reviews.
-            </p>
-            <div className="textarea-field">
-              <Label htmlFor="review-wants">Want to see</Label>
-              <Textarea
-                id="review-wants"
-                value={reviewWants}
-                onChange={(event) => setReviewWants(event.target.value)}
-                placeholder="Responsive management, quiet at night, reliable maintenance…"
-                aria-describedby="reviews-help"
-              />
-            </div>
-            <div className="textarea-field">
-              <Label htmlFor="review-avoids">Want to avoid</Label>
-              <Textarea
-                id="review-avoids"
-                value={reviewAvoids}
-                onChange={(event) => setReviewAvoids(event.target.value)}
-                placeholder="Thin walls, surprise fees, pests…"
-                aria-describedby="reviews-help"
-              />
-            </div>
-          </section>
         </aside>
 
         <section className="workspace" aria-label="Housing results and map">

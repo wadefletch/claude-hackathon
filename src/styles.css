@@ -647,10 +647,6 @@
   .future-filters [data-slot="badge"] { color: #829087; font-size: 0.52rem; }
   .helper-copy { color: #7a8981; font-size: 0.64rem; line-height: 1.5; }
   .future-filters + .helper-copy { margin-top: 0.55rem; }
-  .review-preferences > .helper-copy { margin: -0.15rem 0 0.8rem; }
-  .textarea-field + .textarea-field { margin-top: 0.75rem; }
-  .textarea-field [data-slot="label"] { margin-bottom: 0.4rem; color: #425f51; font-size: 0.68rem; }
-  .textarea-field [data-slot="textarea"] { min-height: 5.2rem; resize: vertical; background: white; color: #263f33; font-size: 0.7rem; line-height: 1.45; }
 
   .workspace {
     display: grid;
