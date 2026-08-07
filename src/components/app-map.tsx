@@ -60,15 +60,16 @@ export function AppMap({
   className,
 }: AppMapProps) {
   const isochroneOrigin = isochrone?.origin ?? home
-  const { data: isochroneData } = useGeoapifyIsochrone(
-    isochrone
-      ? {
-          coordinates: isochroneOrigin.coordinates,
-          mode: isochrone.mode,
-          minutes: isochrone.minutes,
-        }
-      : undefined
-  )
+  const { data: isochroneData, isFetching: isIsochroneLoading } =
+    useGeoapifyIsochrone(
+      isochrone
+        ? {
+            coordinates: isochroneOrigin.coordinates,
+            mode: isochrone.mode,
+            minutes: isochrone.minutes,
+          }
+        : undefined
+    )
 
   const isochroneColor = isochrone?.mode === "transit" ? "#2563eb" : "#ea580c"
 
@@ -80,7 +81,7 @@ export function AppMap({
       )}
       aria-label={`Driving route from ${home.label} to ${work.label}`}
     >
-      <Map loading={isLoading}>
+      <Map loading={isLoading || isIsochroneLoading}>
         <MapControls showCompass showFullscreen />
         {isochroneData && (
           <MapGeoJSON
