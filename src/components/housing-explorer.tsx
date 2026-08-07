@@ -49,7 +49,6 @@ import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
-  InputGroupText,
   InputGroupTextarea,
 } from "@/components/ui/input-group"
 import { Input } from "@/components/ui/input"
@@ -1015,11 +1014,8 @@ export function HousingExplorer({
                       />
                       <InputGroupAddon
                         align="block-end"
-                        className="justify-between"
+                        className="justify-end"
                       >
-                        <InputGroupText>
-                          Shift + Enter for a new line
-                        </InputGroupText>
                         <InputGroupButton
                           type="submit"
                           variant="default"
