@@ -63,6 +63,7 @@ import {
   MIN_RENT,
   modes,
 } from "@/lib/housing-data"
+import type { LatLng } from "@/lib/agent/geo"
 import type { Optimizer, TravelMode } from "@/lib/housing-data"
 import { getBuildingReviewData } from "@/lib/building-reviews"
 import { getNeighborhoodSnapshot } from "@/lib/neighborhood-data"
@@ -88,6 +89,13 @@ const DEFAULT_WORK_LOCATION = {
   coordinates: [-87.633, 41.882] as [number, number],
 }
 
+// Bounds for the "Maximum commute" slider. Realistic transit trips start
+// around 13-15 minutes even for the closest listings once the new access-time
+// model is applied, so the floor sits at 15 and the ceiling stretches to 90 to
+// still surface the far South/North Side listings Danielle is comparing.
+const MIN_COMMUTE_MINUTES = 15
+const MAX_COMMUTE_MINUTES = 90
+
 // The agent's TransportMode is a superset of this demo's TravelMode (no
 // "bike" here, so it falls back to "walk" as the closest non-motorized mode).
 const AGENT_MODE_TO_TRAVEL_MODE: Record<TransportMode, TravelMode> = {
@@ -103,7 +111,7 @@ export function HousingExplorer({
 }: {
   developments: HousingDevelopment[]
 }) {
-  const [maxMinutes, setMaxMinutes] = useState(20)
+  const [maxMinutes, setMaxMinutes] = useState(35)
   const [maxRent, setMaxRent] = useState(MAX_RENT)
   const [manualMode, setManualMode] = useState<TravelMode>("train")
   const [optimizer, setOptimizer] = useState<Optimizer | null>(null)
@@ -128,13 +136,24 @@ export function HousingExplorer({
       ),
     [realHomes, monthlyIncome, bedsNeeded]
   )
-  const explorer = useMemo(
-    () =>
-      optimizer
-        ? getOptimizedResults(optimizer, maxMinutes, maxRent, eligibleHomes)
-        : getManualResults(manualMode, maxMinutes, maxRent, eligibleHomes),
-    [manualMode, maxMinutes, maxRent, optimizer, eligibleHomes]
+  const workLatLng: LatLng = useMemo(
+    () => ({
+      lat: workLocation.coordinates[1],
+      lng: workLocation.coordinates[0],
+    }),
+    [workLocation]
   )
+  const explorer = useMemo(() => {
+    const query = {
+      maxMinutes,
+      maxRent,
+      work: workLatLng,
+      homeList: eligibleHomes,
+    }
+    return optimizer
+      ? getOptimizedResults(optimizer, query)
+      : getManualResults(manualMode, query)
+  }, [manualMode, maxMinutes, maxRent, optimizer, eligibleHomes, workLatLng])
   const activeMode = explorer.mode
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
@@ -381,14 +400,16 @@ export function HousingExplorer({
       winnerId: isAgentDriven
         ? (agentMatches[0]?.housing.id ?? null)
         : explorer.winnerId,
-      isochrone:
-        activeMode === "walk"
-          ? undefined
-          : {
-              origin: workLocation,
-              mode: activeMode === "train" ? "transit" : "drive",
-              minutes: maxMinutes,
-            },
+      isochrone: {
+        origin: workLocation,
+        mode:
+          activeMode === "train"
+            ? "transit"
+            : activeMode === "walk"
+              ? "walk"
+              : "drive",
+        minutes: maxMinutes,
+      },
     }),
     [
       activeMode,
@@ -510,8 +531,8 @@ export function HousingExplorer({
                     </div>
                     <Slider
                       aria-label="Maximum commute time in minutes"
-                      min={15}
-                      max={60}
+                      min={MIN_COMMUTE_MINUTES}
+                      max={MAX_COMMUTE_MINUTES}
                       step={5}
                       value={[maxMinutes]}
                       onValueChange={(value) =>
@@ -522,8 +543,8 @@ export function HousingExplorer({
                       className="mt-2 flex justify-between text-xs text-muted-foreground"
                       aria-hidden="true"
                     >
-                      <span>15 min</span>
-                      <span>60 min</span>
+                      <span>{MIN_COMMUTE_MINUTES} min</span>
+                      <span>{MAX_COMMUTE_MINUTES} min</span>
                     </div>
                   </section>
 
@@ -981,7 +1002,10 @@ export function HousingExplorer({
                         tabIndex={0}
                         aria-pressed={selectedId === match.housing.id}
                         onClick={(event) =>
-                          handleHomeSelect(match.housing.id, event.currentTarget)
+                          handleHomeSelect(
+                            match.housing.id,
+                            event.currentTarget
+                          )
                         }
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
@@ -1000,7 +1024,9 @@ export function HousingExplorer({
                                 {match.housing.communityArea ??
                                   match.housing.propertyName}
                               </CardDescription>
-                              <CardTitle>{match.housing.propertyName}</CardTitle>
+                              <CardTitle>
+                                {match.housing.propertyName}
+                              </CardTitle>
                             </div>
                             {index === 0 && (
                               <Badge className="shrink-0">

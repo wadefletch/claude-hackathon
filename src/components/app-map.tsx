@@ -26,6 +26,10 @@ import { HandGestureMapControls } from "@/components/hand-gesture-map-controls"
 import { useGeoapifyIsochrone } from "@/hooks/use-geoapify-isochrone"
 import type { IsochroneMode } from "@/hooks/use-geoapify-isochrone"
 import { interpolateIsochrone } from "@/lib/isochrone-animation"
+import {
+  pendingIsochronePatternExpression,
+  registerPendingIsochronePatterns,
+} from "@/lib/isochrone-pattern"
 import { MAP_LAYER_ANCHOR_IDS } from "@/lib/map-layer-order"
 import { cn } from "@/lib/utils"
 
@@ -77,6 +81,9 @@ type IsochroneData = FeatureCollection<Geometry>
 
 const ISOCHRONE_TRANSITION_DURATION = 350
 const STALE_ISOCHRONE_COLOR = "#737373"
+const PENDING_ISOCHRONE_MIN_OPACITY = 0.16
+const PENDING_ISOCHRONE_MAX_OPACITY = 0.32
+const PENDING_ISOCHRONE_PULSE_DURATION = 1400
 
 export function AppMap({
   state,
@@ -302,8 +309,17 @@ function AnimatedIsochroneLayer({
   color: string
   isStale: boolean
 }) {
+  const { map, isLoaded, resolvedTheme } = useMap()
   const [animatedData, setAnimatedData] = useState(data)
   const animatedDataRef = useRef(data)
+  const [patternReady, setPatternReady] = useState(false)
+  const pattern = pendingIsochronePatternExpression(resolvedTheme)
+
+  useEffect(() => {
+    if (!map || !isLoaded) return
+
+    setPatternReady(registerPendingIsochronePatterns(map, resolvedTheme))
+  }, [isLoaded, map, resolvedTheme])
 
   useEffect(() => {
     if (data === animatedDataRef.current) return
@@ -335,24 +351,74 @@ function AnimatedIsochroneLayer({
     return () => window.cancelAnimationFrame(animationFrame)
   }, [data])
 
+  useEffect(() => {
+    if (!map || !isLoaded || !isStale || !patternReady) return
+
+    const layerId = "geojson-fill-travel-time-isochrone-pending"
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches
+    let animationFrame = 0
+    const startedAt = performance.now()
+
+    const setOpacity = (opacity: number) => {
+      if (map.getLayer(layerId)) {
+        map.setPaintProperty(layerId, "fill-opacity", opacity)
+      }
+    }
+
+    if (prefersReducedMotion) {
+      setOpacity(PENDING_ISOCHRONE_MIN_OPACITY)
+      return
+    }
+
+    const animate = (now: number) => {
+      const phase =
+        ((now - startedAt) / PENDING_ISOCHRONE_PULSE_DURATION) * Math.PI * 2
+      const wave = (Math.sin(phase - Math.PI / 2) + 1) / 2
+      setOpacity(
+        PENDING_ISOCHRONE_MIN_OPACITY +
+          wave * (PENDING_ISOCHRONE_MAX_OPACITY - PENDING_ISOCHRONE_MIN_OPACITY)
+      )
+      animationFrame = window.requestAnimationFrame(animate)
+    }
+
+    animationFrame = window.requestAnimationFrame(animate)
+    return () => window.cancelAnimationFrame(animationFrame)
+  }, [isLoaded, isStale, map, patternReady])
+
   const layerColor = isStale ? STALE_ISOCHRONE_COLOR : color
 
   return (
-    <MapGeoJSON
-      id="travel-time-isochrone"
-      data={animatedData}
-      beforeId={MAP_LAYER_ANCHOR_IDS.coverage}
-      fillPaint={{
-        "fill-color": layerColor,
-        "fill-color-transition": { duration: 200 },
-        "fill-opacity": 0.2,
-      }}
-      linePaint={{
-        "line-color": layerColor,
-        "line-color-transition": { duration: 200 },
-        "line-width": 2,
-      }}
-    />
+    <>
+      <MapGeoJSON
+        id="travel-time-isochrone"
+        data={animatedData}
+        beforeId={MAP_LAYER_ANCHOR_IDS.coverage}
+        fillPaint={{
+          "fill-color": layerColor,
+          "fill-color-transition": { duration: 200 },
+          "fill-opacity": isStale ? 0 : 0.2,
+        }}
+        linePaint={{
+          "line-color": layerColor,
+          "line-color-transition": { duration: 200 },
+          "line-width": 2,
+        }}
+      />
+      {patternReady && isStale && (
+        <MapGeoJSON
+          id="travel-time-isochrone-pending"
+          data={animatedData}
+          beforeId={MAP_LAYER_ANCHOR_IDS.coverage}
+          fillPaint={{
+            "fill-pattern": pattern,
+            "fill-opacity": PENDING_ISOCHRONE_MIN_OPACITY,
+          }}
+          linePaint={false}
+        />
+      )}
+    </>
   )
 }
 
