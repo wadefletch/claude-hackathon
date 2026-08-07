@@ -1,7 +1,7 @@
 import type { Map as MapLibreMap } from "maplibre-gl"
 
-const PATTERN_SIZE = 40
-const STRIPE_WIDTH = 20
+const PATTERN_SIZE = 14
+const STRIPE_WIDTH = 7
 
 export function pendingIsochronePatternId(theme: string) {
   return `pending-isochrone-pattern-${theme}`
