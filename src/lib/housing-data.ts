@@ -32,6 +32,9 @@ export interface ExplorerResult {
 
 export const destination = "The Loop · 200 W Madison St"
 
+export const MIN_RENT = 800
+export const MAX_RENT = 1400
+
 export const modes: Record<TravelMode, ModeConfig> = {
   train: { label: "Train", factor: 1, monthlyCost: 75 },
   walk: { label: "Walk", factor: 2.4, monthlyCost: 0 },
@@ -206,7 +209,11 @@ export function commuteFor(home: Home, mode: TravelMode) {
   return Math.round(home.trainMinutes * modes[mode].factor)
 }
 
-function reachable(mode: TravelMode, maxMinutes: number): HomeResult[] {
+function reachable(
+  mode: TravelMode,
+  maxMinutes: number,
+  maxRent: number
+): HomeResult[] {
   return homes
     .map((home) => ({
       ...home,
@@ -214,14 +221,15 @@ function reachable(mode: TravelMode, maxMinutes: number): HomeResult[] {
       commute: commuteFor(home, mode),
       monthlyCost: modes[mode].monthlyCost,
     }))
-    .filter((home) => home.commute <= maxMinutes)
+    .filter((home) => home.commute <= maxMinutes && home.rent <= maxRent)
 }
 
 export function getManualResults(
   mode: TravelMode,
-  maxMinutes: number
+  maxMinutes: number,
+  maxRent: number
 ): ExplorerResult {
-  const results = reachable(mode, maxMinutes).sort(
+  const results = reachable(mode, maxMinutes, maxRent).sort(
     (a, b) => a.commute - b.commute || a.rent - b.rent
   )
   return { results, mode, winnerId: null }
@@ -229,14 +237,19 @@ export function getManualResults(
 
 export function getOptimizedResults(
   optimizer: Optimizer,
-  maxMinutes: number
+  maxMinutes: number,
+  maxRent: number
 ): ExplorerResult {
   const mode: TravelMode = optimizer === "cheapest" ? "train" : "rideshare"
-  const candidates = reachable(mode, maxMinutes)
-  const winner = [...candidates].sort((a, b) =>
-    optimizer === "cheapest"
-      ? a.rent - b.rent || a.commute - b.commute
-      : a.commute - b.commute || a.rent - b.rent
-  )[0]
+  const candidates = reachable(mode, maxMinutes, maxRent)
+  const winner = [...candidates]
+    .sort((a, b) =>
+      optimizer === "cheapest"
+        ? a.rent - b.rent || a.commute - b.commute
+        : a.commute - b.commute || a.rent - b.rent
+    )
+    .at(0)
+  // The rent filter can exclude every candidate, so there may be no winner.
+  if (!winner) return { results: [], mode, winnerId: null }
   return { results: [winner], mode, winnerId: winner.id }
 }
