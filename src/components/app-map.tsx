@@ -16,6 +16,10 @@ import { TransitLayers } from "@/components/transit-layers"
 import { HandGestureMapControls } from "@/components/hand-gesture-map-controls"
 import { useGeoapifyIsochrone } from "@/hooks/use-geoapify-isochrone"
 import type { IsochroneMode } from "@/hooks/use-geoapify-isochrone"
+import {
+  dataSourceMarkerImageId,
+  registerDataSourceMarkerIcons,
+} from "@/lib/map-data-source-icons"
 import { cn } from "@/lib/utils"
 
 export type AppMapLocation = {
@@ -199,32 +203,7 @@ function GroceryStoresLayer({
 
   useEffect(() => {
     if (!map || !isLoaded) return
-
-    map.addSource(sourceId, {
-      type: "geojson",
-      data: "/data/grocery-store-status-historical.geojson",
-    })
-
-    map.addLayer({
-      id: layerId,
-      type: "circle",
-      source: sourceId,
-      paint: {
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 3, 14, 7],
-        "circle-color": [
-          "match",
-          ["get", "new_status"],
-          "CLOSED",
-          "#dc2626",
-          "ONLINE ORDERS ONLY",
-          "#d97706",
-          "#16a34a",
-        ],
-        "circle-opacity": 0.8,
-        "circle-stroke-color": "#ffffff",
-        "circle-stroke-width": 1,
-      },
-    })
+    let cancelled = false
 
     const handleClick = (event: MapLayerMouseEvent) => {
       const feature = event.features?.[0]
@@ -251,14 +230,50 @@ function GroceryStoresLayer({
       map.getCanvas().style.cursor = ""
     }
 
-    map.on("click", layerId, handleClick)
-    map.on("mouseenter", layerId, handleMouseEnter)
-    map.on("mouseleave", layerId, handleMouseLeave)
+    void registerDataSourceMarkerIcons(map, [
+      "groceryStore",
+      "groceryStoreLimited",
+      "groceryStoreClosed",
+    ]).then(() => {
+      if (cancelled) return
+
+      map.addSource(sourceId, {
+        type: "geojson",
+        data: "/data/grocery-store-status-historical.geojson",
+      })
+
+      map.addLayer({
+        id: layerId,
+        type: "symbol",
+        source: sourceId,
+        layout: {
+          "icon-image": [
+            "match",
+            ["get", "new_status"],
+            "CLOSED",
+            dataSourceMarkerImageId("groceryStoreClosed"),
+            "ONLINE ORDERS ONLY",
+            dataSourceMarkerImageId("groceryStoreLimited"),
+            dataSourceMarkerImageId("groceryStore"),
+          ],
+          "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 0.68, 14, 0.94],
+          "icon-allow-overlap": false,
+          "icon-padding": 2,
+        },
+      })
+
+      map.on("click", layerId, handleClick)
+      map.on("mouseenter", layerId, handleMouseEnter)
+      map.on("mouseleave", layerId, handleMouseLeave)
+    })
 
     return () => {
-      map.off("click", layerId, handleClick)
-      map.off("mouseenter", layerId, handleMouseEnter)
-      map.off("mouseleave", layerId, handleMouseLeave)
+      cancelled = true
+      if (map.getLayer(layerId)) {
+        map.off("click", layerId, handleClick)
+        map.off("mouseenter", layerId, handleMouseEnter)
+        map.off("mouseleave", layerId, handleMouseLeave)
+      }
       if (map.getLayer(layerId)) map.removeLayer(layerId)
       if (map.getSource(sourceId)) map.removeSource(sourceId)
       map.getCanvas().style.cursor = ""
