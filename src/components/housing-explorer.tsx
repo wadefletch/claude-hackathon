@@ -144,6 +144,7 @@ export function HousingExplorer({
   const detailDialogRef = useRef<HTMLDialogElement>(null)
   const detailTriggerRef = useRef<HTMLElement | null>(null)
   const chatScrollRef = useRef<HTMLDivElement>(null)
+  const matchesScrollRef = useRef<HTMLDivElement>(null)
   const {
     messages: chatMessages,
     sendMessage: sendChatMessage,
@@ -275,6 +276,16 @@ export function HousingExplorer({
     container.scrollTop = container.scrollHeight
   }, [chatMessages])
 
+  // Bring the selected home's card into view in the Matches list — e.g. after
+  // selecting it from a map marker, the card may be scrolled out of sight.
+  useEffect(() => {
+    if (!selectedId) return
+    const card = matchesScrollRef.current?.querySelector(
+      `[data-home-id="${selectedId}"]`
+    )
+    card?.scrollIntoView({ block: "nearest", behavior: "smooth" })
+  }, [selectedId])
+
   const openBuildingDetail = (id: string, trigger: HTMLElement) => {
     detailTriggerRef.current = trigger
     setSelectedId(id)
@@ -291,6 +302,12 @@ export function HousingExplorer({
       return
     }
     openBuildingDetail(id, trigger)
+  }
+
+  // Clicking a map marker only selects the home — it highlights the matching
+  // card in the Matches list without opening the full detail dialog.
+  const selectHome = (id: string) => {
+    setSelectedId(id)
   }
 
   const closeBuildingDetail = () => {
@@ -906,9 +923,7 @@ export function HousingExplorer({
               <AppMap
                 className="min-h-0 flex-1 rounded-none border-0 shadow-none"
                 state={mapState}
-                onHomeSelect={(home, trigger) =>
-                  handleHomeSelect(home.id, trigger)
-                }
+                onHomeSelect={(home) => selectHome(home.id)}
                 onNeighborhoodSelect={setFocusedNeighborhood}
               />
 
@@ -963,7 +978,10 @@ export function HousingExplorer({
                 </Badge>
               </div>
 
-              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+              <div
+                ref={matchesScrollRef}
+                className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3"
+              >
                 {isAgentDriven ? (
                   agentMatches.map((match, index) => {
                     const workRoute = match.routes.find(
@@ -972,6 +990,7 @@ export function HousingExplorer({
                     return (
                       <Card
                         key={match.housing.id}
+                        data-home-id={match.housing.id}
                         className={cn(
                           "shrink-0 cursor-pointer",
                           selectedId === match.housing.id &&
@@ -1054,6 +1073,7 @@ export function HousingExplorer({
                   displayedResults.map((home) => (
                     <Card
                       key={home.id}
+                      data-home-id={home.id}
                       className={cn(
                         "shrink-0 cursor-pointer",
                         selectedId === home.id && "ring-2 ring-primary"
