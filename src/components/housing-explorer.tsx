@@ -325,23 +325,6 @@ export function HousingExplorer() {
 
   return (
     <main className="flex h-svh min-h-svh flex-col overflow-hidden bg-background text-foreground">
-      <header className="flex h-16 shrink-0 items-center justify-between border-b bg-background/95 px-3 backdrop-blur sm:px-4">
-        <a
-          className="inline-flex items-center gap-2 text-sm font-medium"
-          href="#top"
-          aria-label="Qualifind home"
-        >
-          <span
-            className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground"
-            aria-hidden="true"
-          >
-            <SearchCheck className="size-4" />
-          </span>
-          <span>Qualifind</span>
-        </a>
-        <Badge variant="outline">Chicago, IL</Badge>
-      </header>
-
       <div className="min-h-0 flex-1 overflow-hidden" id="top">
         <ResizablePanelGroup orientation="horizontal" className="h-full">
           <ResizablePanel
@@ -353,6 +336,13 @@ export function HousingExplorer() {
               className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background"
               aria-label="Housing and commute filters"
             >
+              <div className="flex h-16 shrink-0 items-center border-b px-4">
+                <img
+                  src="/qualifind-logo.svg"
+                  alt="QualiFind"
+                  className="h-10 w-auto"
+                />
+              </div>
               <Tabs
                 defaultValue="filters"
                 className="flex h-full min-h-0 flex-col gap-0"
