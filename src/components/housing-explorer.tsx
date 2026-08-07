@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useChat } from "@ai-sdk/react"
 import { useNavigate } from "@tanstack/react-router"
 import { Streamdown } from "streamdown"
+import "streamdown/styles.css"
 import {
   Bot,
   Building2,
@@ -187,6 +188,11 @@ export function HousingExplorer({
   } = useChat()
   const [chatInput, setChatInput] = useState("")
   const isChatBusy = chatStatus === "submitted" || chatStatus === "streaming"
+  const latestMessage = chatMessages.at(-1)
+  const streamingMessageId =
+    chatStatus === "streaming" && latestMessage?.role === "assistant"
+      ? latestMessage.id
+      : undefined
 
   // Agent-produced app/map state lives in the URL (query params), not just
   // in this component's memory, so a reload/back-forward preserves it and
@@ -809,7 +815,18 @@ export function HousingExplorer({
                                         >
                                           <BubbleContent>
                                             {message.role === "assistant" ? (
-                                              <Streamdown>
+                                              <Streamdown
+                                                animated={{
+                                                  animation: "fadeIn",
+                                                  duration: 150,
+                                                  easing: "ease-out",
+                                                  sep: "char",
+                                                }}
+                                                isAnimating={
+                                                  message.id ===
+                                                  streamingMessageId
+                                                }
+                                              >
                                                 {part.text}
                                               </Streamdown>
                                             ) : (
