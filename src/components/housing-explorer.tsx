@@ -514,16 +514,12 @@ export function HousingExplorer({
                           <ToggleGroupItem
                             key={mode}
                             value={mode}
-                            aria-label={`${modes[mode].label}, $${modes[mode].monthlyCost} monthly travel cost`}
                             className="w-full justify-start"
                           >
                             <Icon data-icon="inline-start" />
                             <span className="truncate">
                               {modes[mode].label}
                             </span>
-                            <small className="ml-auto truncate text-xs text-muted-foreground">
-                              ${modes[mode].monthlyCost}/mo
-                            </small>
                           </ToggleGroupItem>
                         )
                       })}
