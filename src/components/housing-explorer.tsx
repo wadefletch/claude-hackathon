@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useChat } from "@ai-sdk/react"
 import { useNavigate } from "@tanstack/react-router"
-import { Streamdown } from "streamdown"
+import { defaultRemarkPlugins, Streamdown } from "streamdown"
 import {
   Bot,
   Building2,
@@ -113,6 +113,8 @@ const DEFAULT_WORK_LOCATION = {
 const MIN_COMMUTE_MINUTES = 15
 const MAX_COMMUTE_MINUTES = 90
 
+const GFM_REMARK_PLUGINS = Object.values(defaultRemarkPlugins)
+
 // The agent's TransportMode is a superset of this demo's TravelMode (no
 // "bike" here, so it falls back to "walk" as the closest non-motorized mode).
 const AGENT_MODE_TO_TRAVEL_MODE: Record<TransportMode, TravelMode> = {
@@ -175,7 +177,9 @@ function SmoothStreamdown({ text, active }: { text: string; active: boolean }) {
     return () => cancelAnimationFrame(animationFrame)
   }, [active, text])
 
-  return <Streamdown>{visibleText}</Streamdown>
+  return (
+    <Streamdown remarkPlugins={GFM_REMARK_PLUGINS}>{visibleText}</Streamdown>
+  )
 }
 
 export function HousingExplorer({
@@ -923,7 +927,11 @@ export function HousingExplorer({
                                                     </p>
                                                   )}
                                                   <div className="mt-2">
-                                                    <Streamdown>
+                                                    <Streamdown
+                                                      remarkPlugins={
+                                                        GFM_REMARK_PLUGINS
+                                                      }
+                                                    >
                                                       {match.rationale}
                                                     </Streamdown>
                                                   </div>
@@ -1201,7 +1209,9 @@ export function HousingExplorer({
                               {workRoute.mode} to work
                             </p>
                           )}
-                          <Streamdown>{match.rationale}</Streamdown>
+                          <Streamdown remarkPlugins={GFM_REMARK_PLUGINS}>
+                            {match.rationale}
+                          </Streamdown>
                         </CardContent>
                       </Card>
                     )
