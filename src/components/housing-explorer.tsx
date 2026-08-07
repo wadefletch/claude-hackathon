@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useChat } from "@ai-sdk/react"
 import { useNavigate } from "@tanstack/react-router"
+import { Streamdown } from "streamdown"
 import {
   Bot,
   Building2,
@@ -10,6 +11,7 @@ import {
   DollarSign,
   ExternalLink,
   Footprints,
+  Loader2,
   MapPin,
   Navigation,
   SearchCheck,
@@ -26,6 +28,7 @@ import {
 import { AppMap } from "@/components/app-map"
 import type { AppMapHome, AppMapState } from "@/components/app-map"
 import { Badge } from "@/components/ui/badge"
+import { Bubble, BubbleContent } from "@/components/ui/bubble"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -42,8 +45,24 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupText,
+  InputGroupTextarea,
+} from "@/components/ui/input-group"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Message, MessageContent, MessageFooter } from "@/components/ui/message"
+import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from "@/components/ui/message-scroller"
 import {
   ResizableHandle,
   ResizablePanel,
@@ -52,7 +71,6 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Slider } from "@/components/ui/slider"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
   buildHomesFromDevelopments,
@@ -74,7 +92,6 @@ import type {
   TransportMode,
   WorkLocation,
 } from "@/domain"
-import { AgentMarkdown } from "@/components/agent-markdown"
 import { cn } from "@/lib/utils"
 
 const modeIcons = {
@@ -162,13 +179,14 @@ export function HousingExplorer({
   >("overview")
   const detailDialogRef = useRef<HTMLDialogElement>(null)
   const detailTriggerRef = useRef<HTMLElement | null>(null)
-  const chatScrollRef = useRef<HTMLDivElement>(null)
   const {
+    error: chatError,
     messages: chatMessages,
     sendMessage: sendChatMessage,
     status: chatStatus,
   } = useChat()
   const [chatInput, setChatInput] = useState("")
+  const isChatBusy = chatStatus === "submitted" || chatStatus === "streaming"
 
   // Agent-produced app/map state lives in the URL (query params), not just
   // in this component's memory, so a reload/back-forward preserves it and
@@ -285,15 +303,6 @@ export function HousingExplorer({
     if (isDetailOpen && dialog && !dialog.open) dialog.showModal()
   }, [isDetailOpen, selectedId])
 
-  // Keep the chat thread pinned to the latest content — new messages and
-  // streamed tokens both update `chatMessages`, so this fires continuously
-  // while the agent is replying, not just when a full message completes.
-  useEffect(() => {
-    const container = chatScrollRef.current
-    if (!container) return
-    container.scrollTop = container.scrollHeight
-  }, [chatMessages])
-
   const openBuildingDetail = (id: string, trigger: HTMLElement) => {
     detailTriggerRef.current = trigger
     setSelectedId(id)
@@ -333,8 +342,8 @@ export function HousingExplorer({
   }
 
   const submitChatMessage = () => {
-    if (!chatInput.trim() || chatStatus === "streaming") return
-    sendChatMessage({ text: chatInput })
+    if (!chatInput.trim() || isChatBusy) return
+    void sendChatMessage({ text: chatInput })
     setChatInput("")
   }
 
@@ -481,7 +490,7 @@ export function HousingExplorer({
                 defaultValue="filters"
                 className="flex h-full min-h-0 flex-col gap-0"
               >
-                <TabsList className="m-3 shrink-0">
+                <TabsList className="m-3 w-auto shrink-0">
                   <TabsTrigger value="filters">
                     <SlidersHorizontal data-icon="inline-start" /> Filters
                   </TabsTrigger>
@@ -736,133 +745,178 @@ export function HousingExplorer({
                 <TabsContent
                   value="agent"
                   className="flex min-h-0 flex-1 flex-col"
-                  aria-labelledby="agent-title"
                 >
-                  <p
-                    id="agent-title"
-                    className="shrink-0 px-4 pb-2 text-xs text-muted-foreground"
-                  >
-                    Ask about commute, budget, or eligibility
-                  </p>
-
-                  <div
-                    ref={chatScrollRef}
-                    className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4"
-                  >
-                    {chatMessages.length === 0 && (
-                      <div className="flex items-start gap-2">
-                        <span
-                          className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
-                          aria-hidden="true"
+                  <MessageScrollerProvider autoScroll>
+                    <MessageScroller className="flex-1">
+                      <MessageScrollerViewport className="border-t">
+                        <MessageScrollerContent
+                          className="gap-4 p-4"
+                          aria-busy={chatStatus === "streaming"}
                         >
-                          <Bot className="size-3" />
-                        </span>
-                        <div className="flex flex-col items-start gap-2">
-                          <p className="rounded-lg bg-muted p-3 text-sm leading-6 text-foreground">
-                            Tell me about your commute, budget, and household —
-                            or check whether you qualify for affordable housing.
-                          </p>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={chatStatus === "streaming"}
-                            onClick={() =>
-                              sendChatMessage({ text: "See if I qualify" })
-                            }
-                          >
-                            <SearchCheck data-icon="inline-start" /> See if I
-                            qualify
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    {chatMessages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={cn(
-                          "flex items-start gap-2",
-                          message.role === "user" && "flex-row-reverse"
-                        )}
-                      >
-                        {message.role === "assistant" && (
-                          <span
-                            className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
-                            aria-hidden="true"
-                          >
-                            <Bot className="size-3" />
-                          </span>
-                        )}
-                        <div className="flex min-w-0 flex-1 flex-col gap-3">
-                          {message.parts.map((part, index) => {
-                            if (part.type === "text") {
-                              return (
-                                <div
-                                  key={`${message.id}-${index}`}
-                                  className={cn(
-                                    "rounded-lg p-3 text-sm",
-                                    message.role === "user"
-                                      ? "ml-auto max-w-[85%] bg-primary text-primary-foreground"
-                                      : "max-w-[85%] bg-muted text-foreground"
-                                  )}
-                                >
-                                  <AgentMarkdown>{part.text}</AgentMarkdown>
-                                </div>
-                              )
-                            }
-                            if (
-                              part.type === "tool-show_map" &&
-                              part.state === "output-available"
-                            ) {
-                              const payload = part.output as ShowMapInput
-                              return (
-                                <div
-                                  key={`${message.id}-${index}`}
-                                  className="flex flex-col gap-3"
-                                >
-                                  {payload.matches.map((match) => {
-                                    const workRoute = match.routes.find(
-                                      (route) => route.purpose === "work"
-                                    )
-                                    return (
-                                      <Card key={match.housing.id}>
-                                        <CardHeader>
-                                          <CardDescription>
-                                            {match.housing.communityArea ??
-                                              match.housing.propertyName}
-                                          </CardDescription>
-                                          <CardTitle className="text-sm">
-                                            {match.housing.address}
-                                          </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="text-sm text-muted-foreground">
-                                          {workRoute && (
-                                            <p>
-                                              {workRoute.durationMinutes} min by{" "}
-                                              {workRoute.mode} to work
-                                            </p>
-                                          )}
-                                          <div className="mt-2">
-                                            <AgentMarkdown>
-                                              {match.rationale}
-                                            </AgentMarkdown>
-                                          </div>
-                                        </CardContent>
-                                      </Card>
-                                    )
+                          {chatMessages.length === 0 && (
+                            <MessageScrollerItem messageId="agent-welcome">
+                              <Message>
+                                <MessageContent>
+                                  <Bubble variant="ghost">
+                                    <BubbleContent>
+                                      Tell me about your commute, budget, and
+                                      household — or check whether you qualify
+                                      for affordable housing.
+                                    </BubbleContent>
+                                  </Bubble>
+                                  <MessageFooter>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={isChatBusy}
+                                      onClick={() =>
+                                        void sendChatMessage({
+                                          text: "See if I qualify",
+                                        })
+                                      }
+                                    >
+                                      <SearchCheck data-icon="inline-start" />
+                                      See if I qualify
+                                    </Button>
+                                  </MessageFooter>
+                                </MessageContent>
+                              </Message>
+                            </MessageScrollerItem>
+                          )}
+                          {chatMessages.map((message) => (
+                            <MessageScrollerItem
+                              key={message.id}
+                              messageId={message.id}
+                              scrollAnchor={message.role === "user"}
+                            >
+                              <Message
+                                align={
+                                  message.role === "user" ? "end" : "start"
+                                }
+                              >
+                                <MessageContent>
+                                  {message.parts.map((part, index) => {
+                                    if (part.type === "text") {
+                                      return (
+                                        <Bubble
+                                          key={`${message.id}-${index}`}
+                                          variant={
+                                            message.role === "user"
+                                              ? "secondary"
+                                              : "ghost"
+                                          }
+                                        >
+                                          <BubbleContent>
+                                            {message.role === "assistant" ? (
+                                              <Streamdown>
+                                                {part.text}
+                                              </Streamdown>
+                                            ) : (
+                                              part.text
+                                            )}
+                                          </BubbleContent>
+                                        </Bubble>
+                                      )
+                                    }
+                                    if (
+                                      part.type === "tool-show_map" &&
+                                      part.state === "output-available"
+                                    ) {
+                                      const payload =
+                                        part.output as ShowMapInput
+                                      return (
+                                        <div
+                                          key={`${message.id}-${index}`}
+                                          className="flex flex-col gap-3"
+                                        >
+                                          {payload.matches.map((match) => {
+                                            const workRoute = match.routes.find(
+                                              (route) =>
+                                                route.purpose === "work"
+                                            )
+                                            return (
+                                              <Card key={match.housing.id}>
+                                                <CardHeader>
+                                                  <CardDescription>
+                                                    {match.housing
+                                                      .communityArea ??
+                                                      match.housing
+                                                        .propertyName}
+                                                  </CardDescription>
+                                                  <CardTitle className="text-sm">
+                                                    {match.housing.address}
+                                                  </CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="text-sm text-muted-foreground">
+                                                  {workRoute && (
+                                                    <p>
+                                                      {
+                                                        workRoute.durationMinutes
+                                                      }{" "}
+                                                      min by {workRoute.mode} to
+                                                      work
+                                                    </p>
+                                                  )}
+                                                  <div className="mt-2">
+                                                    <Streamdown>
+                                                      {match.rationale}
+                                                    </Streamdown>
+                                                  </div>
+                                                </CardContent>
+                                              </Card>
+                                            )
+                                          })}
+                                        </div>
+                                      )
+                                    }
+                                    return null
                                   })}
-                                </div>
-                              )
-                            }
-                            return null
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                                </MessageContent>
+                              </Message>
+                            </MessageScrollerItem>
+                          ))}
+                          {chatStatus === "submitted" && (
+                            <MessageScrollerItem messageId="agent-loading">
+                              <Message>
+                                <MessageContent>
+                                  <Bubble variant="ghost">
+                                    <BubbleContent
+                                      role="status"
+                                      aria-label="Agent is thinking"
+                                    >
+                                      <Loader2
+                                        className="animate-spin"
+                                        aria-hidden="true"
+                                      />
+                                    </BubbleContent>
+                                  </Bubble>
+                                </MessageContent>
+                              </Message>
+                            </MessageScrollerItem>
+                          )}
+                          {chatError && (
+                            <MessageScrollerItem messageId="agent-error">
+                              <Message>
+                                <MessageContent>
+                                  <Bubble variant="destructive">
+                                    <BubbleContent role="alert">
+                                      I couldn&apos;t finish that response.
+                                      Please try again.
+                                    </BubbleContent>
+                                  </Bubble>
+                                </MessageContent>
+                              </Message>
+                            </MessageScrollerItem>
+                          )}
+                        </MessageScrollerContent>
+                      </MessageScrollerViewport>
+                      <MessageScrollerButton />
+                    </MessageScroller>
+                  </MessageScrollerProvider>
 
                   <form
-                    className="grid shrink-0 grid-cols-[1fr_auto] gap-2 border-t p-3"
+                    className="shrink-0 p-3"
                     onSubmit={(event) => {
                       event.preventDefault()
                       submitChatMessage()
@@ -871,28 +925,40 @@ export function HousingExplorer({
                     <Label htmlFor="agent-message" className="sr-only">
                       Message the housing agent
                     </Label>
-                    <Textarea
-                      id="agent-message"
-                      className="min-h-16 resize-none"
-                      value={chatInput}
-                      onChange={(event) => setChatInput(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" && !event.shiftKey) {
-                          event.preventDefault()
-                          submitChatMessage()
-                        }
-                      }}
-                      placeholder="Message the housing agent"
-                      rows={2}
-                      disabled={chatStatus === "streaming"}
-                    />
-                    <Button
-                      className="h-16"
-                      type="submit"
-                      disabled={chatStatus === "streaming" || !chatInput.trim()}
-                    >
-                      <Send data-icon="inline-start" /> Send
-                    </Button>
+                    <InputGroup>
+                      <InputGroupTextarea
+                        id="agent-message"
+                        className="min-h-16"
+                        value={chatInput}
+                        onChange={(event) => setChatInput(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && !event.shiftKey) {
+                            event.preventDefault()
+                            submitChatMessage()
+                          }
+                        }}
+                        placeholder="Message the housing agent"
+                        rows={2}
+                        disabled={isChatBusy}
+                      />
+                      <InputGroupAddon
+                        align="block-end"
+                        className="justify-between"
+                      >
+                        <InputGroupText>
+                          Shift + Enter for a new line
+                        </InputGroupText>
+                        <InputGroupButton
+                          type="submit"
+                          variant="default"
+                          size="icon-sm"
+                          disabled={isChatBusy || !chatInput.trim()}
+                          aria-label="Send message"
+                        >
+                          <Send />
+                        </InputGroupButton>
+                      </InputGroupAddon>
+                    </InputGroup>
                   </form>
                 </TabsContent>
               </Tabs>
@@ -1071,7 +1137,7 @@ export function HousingExplorer({
                               {workRoute.mode} to work
                             </p>
                           )}
-                          <AgentMarkdown>{match.rationale}</AgentMarkdown>
+                          <Streamdown>{match.rationale}</Streamdown>
                         </CardContent>
                       </Card>
                     )
