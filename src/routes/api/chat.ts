@@ -19,11 +19,11 @@ export const Route = createFileRoute("/api/chat")({
         const { messages }: { messages: UIMessage[] } = await request.json()
 
         const result = streamText({
-          model: anthropic("claude-sonnet-5"),
+          model: anthropic("claude-haiku-4-5-20251001"),
           system: AGENT_SYSTEM_PROMPT,
           messages: await convertToModelMessages(messages),
           tools: agentTools,
-          stopWhen: isStepCount(8),
+          stopWhen: isStepCount(12),
         })
 
         return createUIMessageStreamResponse({

@@ -26,11 +26,11 @@ function soqlList(values: string[]): string {
 
 export const searchHousingDevelopments = tool({
   description:
-    "Search Chicago's real affordable rental housing developments (Chicago Open Data, resource s6ha-ppgi) by community area and/or property type. This feed has no rent or bedroom data — call getHousingDetail for that.",
+    "Search Chicago's real affordable rental housing developments (Chicago Open Data, resource s6ha-ppgi) by community area and/or property type. This feed has no rent or bedroom data — call getHousingDetail for that. Keep limit small (default 15): you'll be evaluating each result in detail with other tools, so a large limit means a slow, expensive turn — narrow with communityAreas/propertyTypes instead of raising it.",
   inputSchema: z.object({
     communityAreas: z.array(z.string()).optional(),
     propertyTypes: z.array(z.string()).optional(),
-    limit: z.number().int().positive().max(200).default(50),
+    limit: z.number().int().positive().max(50).default(15),
   }),
   execute: async ({ communityAreas, propertyTypes, limit }) => {
     const params = new URLSearchParams({ $limit: String(limit) })

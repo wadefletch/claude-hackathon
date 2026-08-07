@@ -14,6 +14,11 @@ async function exec<T>(result: T | AsyncIterable<T>): Promise<T> {
 }
 
 describe("agent tools", () => {
+  it("searchHousingDevelopments defaults to a small limit so the agent can't accidentally deep-dive dozens of candidates", () => {
+    const parsed = (agentTools.searchHousingDevelopments.inputSchema as any).parse({})
+    expect(parsed.limit).toBeLessThanOrEqual(15)
+  })
+
   it(
     "searchHousingDevelopments returns real, geocoded Chicago developments",
     async () => {
@@ -86,6 +91,17 @@ describe("agent tools", () => {
       )
     )
     expect(far.amenities.length).toBeLessThanOrEqual(near.amenities.length)
+  })
+
+  it("assessEligibility places the Danielle Ochoa persona (single mother, $40,600/yr, household of 2) above extremely-low but not comfortably above the AMI limits", async () => {
+    const result = await exec(
+      agentTools.assessEligibility.execute(
+        { annualHouseholdIncome: 40_600, householdSize: 2 },
+        CALL_OPTIONS
+      )
+    )
+    expect(result.amiTier).not.toBe("extremely-low")
+    expect(result.amiTier).not.toBe("above-low-income")
   })
 
   it("assessEligibility classifies a low-income household as extremely-low", async () => {
