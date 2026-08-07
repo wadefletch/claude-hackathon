@@ -11,6 +11,7 @@ import {
   MessageSquareText,
   MapPin,
   Navigation,
+  SearchCheck,
   Send,
   ShoppingBasket,
   SlidersHorizontal,
@@ -141,15 +142,15 @@ export function HousingExplorer() {
         <a
           className="inline-flex items-center gap-2 text-sm font-medium"
           href="#top"
-          aria-label="ChiRoute home"
+          aria-label="Qualifind home"
         >
           <span
             className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground"
             aria-hidden="true"
           >
-            <Building2 className="size-4" />
+            <SearchCheck className="size-4" />
           </span>
-          <span>ChiRoute</span>
+          <span>Qualifind</span>
         </a>
         <Badge variant="outline">Chicago, IL</Badge>
       </header>
