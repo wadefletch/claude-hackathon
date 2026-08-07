@@ -1,18 +1,17 @@
-# Problem Statement
-
-Chicago residents who qualify for subsidized housing have a hard time finding it. Section 8, CHA, and IHDA all have different eligibility rules, different websites, and different application processes. Figuring out what you actually qualify for based on income and household size takes real effort, and even after finding a unit, there's no easy way to tell if it's near your job, a decent school, or a park.
-
-We're building a tool that fixes this: check your eligibility, see listings that fit your life, and get pointed to the right place to apply.
-
-# Solution
+# QualiFind
 
 QualiFind is a web app that simplifies the search for subsidized housing in Chicago into a single, guided experience by matching users with their best housing fits for their needs.
 
-What it does:
-Enter your household size and income to see what programs you likely qualify for
-Browse listings ranked by proximity to work, schools, parks, and transit
-See real reviews pulled from public sources
-Get sent directly to CHA, IHDA, or the right agency to actually apply
+## Problem
+
+Chicago residents who qualify for subsidized housing have a hard time finding it. Section 8, CHA, and IHDA all have different eligibility rules, different websites, and different application processes. Figuring out what you actually qualify for based on income and household size takes real effort, and even after finding a unit, there's no easy way to tell if it's near your job, a decent school, or a park.
+
+## Solution
+
+- Enter household size and income to check eligibility for Section 8, CHA, and IHDA programs based on current AMI thresholds
+- Browse listings ranked by proximity to work, schools (with quality ratings), grocery stores, parks, trails, beaches, etc.
+- See reviews pulled from public sources to get a real sense of what living there is like
+- Get routed directly to the right agency to apply
 
 # TanStack Start + shadcn/ui
 
