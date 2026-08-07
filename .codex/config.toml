@@ -1,0 +1,8 @@
+default_permissions = "project-edit"
+
+[permissions.project-edit]
+description = "Allow project edits except for protected UI components."
+extends = ":workspace"
+
+[permissions.project-edit.filesystem.":workspace_roots"]
+"src/components/ui" = "read"
