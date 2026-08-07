@@ -409,6 +409,13 @@ export function HousingExplorer({
       winnerId: isAgentDriven
         ? (agentMatches[0]?.housing.id ?? null)
         : explorer.winnerId,
+      // Once the agent has results, only fit the viewport to the (real)
+      // work pin once the agent has actually determined one — otherwise a
+      // still-placeholder work location would pull the initial zoom away
+      // from the neighborhood the agent just searched.
+      hasKnownWorkLocation: isAgentDriven
+        ? latestAgentWorkLocation !== undefined
+        : true,
       isochrone: {
         origin: workLocation,
         mode:
@@ -424,6 +431,7 @@ export function HousingExplorer({
       activeMode,
       agentMatches,
       isAgentDriven,
+      latestAgentWorkLocation,
       explorer.winnerId,
       mapHomes,
       neighborhoodGroups,

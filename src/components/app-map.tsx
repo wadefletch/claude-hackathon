@@ -66,6 +66,10 @@ export type AppMapState = {
   selectedHomeId: string | null
   winnerId: string | null
   isochrone?: IsochroneOptions
+  // False when `work` is still a placeholder (no real address known yet) —
+  // keeps the initial viewport fit from zooming out to cover a faraway
+  // default pin alongside a freshly shown set of homes. Defaults to true.
+  hasKnownWorkLocation?: boolean
 }
 
 export type AppMapProps = {
@@ -96,6 +100,7 @@ export function AppMap({
     selectedHomeId,
     winnerId,
     isochrone,
+    hasKnownWorkLocation = true,
   } = state
   const [visibleLayerIds, setVisibleLayerIds] = useState<MapDataLayerId[]>(
     DEFAULT_VISIBLE_MAP_DATA_LAYER_IDS
@@ -169,7 +174,7 @@ export function AppMap({
         )}
         <LocationsViewport
           coordinates={[
-            work.coordinates,
+            ...(hasKnownWorkLocation ? [work.coordinates] : []),
             ...homes.map((home) => home.coordinates),
           ]}
         />
@@ -508,7 +513,12 @@ function LocationsViewport({
   const coordinatesKey = coordinates.flat().join(",")
 
   useEffect(() => {
-    if (!map || !isLoaded || coordinates.length < 2) return
+    if (!map || !isLoaded || coordinates.length === 0) return
+
+    if (coordinates.length === 1) {
+      map.easeTo({ center: coordinates[0], zoom: 14, duration: 700 })
+      return
+    }
 
     const longitudes = coordinates.map(([longitude]) => longitude)
     const latitudes = coordinates.map(([, latitude]) => latitude)
