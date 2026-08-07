@@ -78,4 +78,15 @@ describe("pinch gesture math", () => {
 
     expect(smoothed).toEqual({ panX: 20, panY: -10, zoom: 0.4 })
   })
+
+  it("settles instead of following small landmark noise", () => {
+    const previous = { panX: 120, panY: -40, zoom: 1.25 }
+    const smoothed = smoothMapMotion(previous, {
+      panX: 122.5,
+      panY: -43,
+      zoom: 1.28,
+    })
+
+    expect(smoothed).toEqual(previous)
+  })
 })
