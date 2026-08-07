@@ -24,11 +24,7 @@ import {
 } from "lucide-react"
 
 import { AppMap } from "@/components/app-map"
-import type {
-  AppMapHome,
-  AppMapState,
-  GroceryStoreSelection,
-} from "@/components/app-map"
+import type { AppMapHome, AppMapState } from "@/components/app-map"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -57,7 +53,6 @@ import { Separator } from "@/components/ui/separator"
 import { Slider } from "@/components/ui/slider"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Toggle } from "@/components/ui/toggle"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
   buildHomesFromDevelopments,
@@ -139,9 +134,6 @@ export function HousingExplorer({
   )
   const activeMode = explorer.mode
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [selectedGroceryStore, setSelectedGroceryStore] =
-    useState<GroceryStoreSelection | null>(null)
-  const [showTransit, setShowTransit] = useState(false)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [detailTab, setDetailTab] = useState<
     "overview" | "reviews" | "neighborhood"
@@ -253,10 +245,6 @@ export function HousingExplorer({
   }, [explorer])
 
   useEffect(() => {
-    setSelectedGroceryStore(null)
-  }, [activeMode, maxMinutes])
-
-  useEffect(() => {
     const dialog = detailDialogRef.current
     if (isDetailOpen && dialog && !dialog.open) dialog.showModal()
   }, [isDetailOpen, selectedId])
@@ -353,9 +341,6 @@ export function HousingExplorer({
       work: workLocation,
       selectedHomeId: selectedId,
       winnerId: explorer.winnerId,
-      showTransit,
-      showGroceryStores: true,
-      selectedGroceryStore,
       isochrone:
         activeMode === "walk"
           ? undefined
@@ -371,9 +356,7 @@ export function HousingExplorer({
       mapHomes,
       neighborhoodGroups,
       maxMinutes,
-      selectedGroceryStore,
       selectedId,
-      showTransit,
       workLocation,
     ]
   )
@@ -839,16 +822,6 @@ export function HousingExplorer({
                   </small>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Toggle
-                    variant="outline"
-                    size="sm"
-                    pressed={showTransit}
-                    onPressedChange={setShowTransit}
-                    aria-label="Show CTA trains and buses"
-                  >
-                    <BusFront data-icon="inline-start" />
-                    Transit
-                  </Toggle>
                   <Badge>
                     <ActiveModeIcon /> {modes[activeMode].label}
                   </Badge>
@@ -862,7 +835,6 @@ export function HousingExplorer({
                   openBuildingDetail(home.id, trigger)
                 }
                 onNeighborhoodSelect={setFocusedNeighborhood}
-                onGroceryStoreSelect={setSelectedGroceryStore}
               />
 
               <div
