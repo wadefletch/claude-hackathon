@@ -45,10 +45,30 @@ describe("agent system prompt", () => {
 
   it("drives the map live off a bare anchor instead of waiting for every preference", () => {
     expect(AGENT_SYSTEM_PROMPT).toContain(
-      "search and call show_map right away with whatever you can determine"
+      "search and call show_map immediately with whatever you can determine"
     )
     expect(AGENT_SYSTEM_PROMPT).toContain(
       "never treat show_map as a one-time \"final\" action"
+    )
+  })
+
+  it("defaults to acting over asking, and caps clarifying questions at one", () => {
+    expect(AGENT_SYSTEM_PROMPT).toContain("Default to acting, not asking")
+    expect(AGENT_SYSTEM_PROMPT).toContain(
+      "ask at most one short question before you search"
+    )
+    expect(AGENT_SYSTEM_PROMPT).toContain(
+      "never stack multiple questions in one reply"
+    )
+  })
+
+  it("keeps text replies short instead of restating what the map/cards already show", () => {
+    expect(AGENT_SYSTEM_PROMPT).toContain("Keep your text replies short")
+    expect(AGENT_SYSTEM_PROMPT).toContain(
+      "don't narrate what you're about to do"
+    )
+    expect(AGENT_SYSTEM_PROMPT).toContain(
+      "don't build markdown tables, headers, or bulleted recaps"
     )
   })
 

@@ -6,7 +6,7 @@ import {
   writeCachedIsochrone,
 } from "@/lib/isochrone-cache"
 
-export type IsochroneMode = "drive" | "transit"
+export type IsochroneMode = "drive" | "transit" | "walk"
 
 type IsochroneQuery = {
   coordinates: [number, number]

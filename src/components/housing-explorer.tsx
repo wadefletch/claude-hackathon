@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useChat } from "@ai-sdk/react"
 import { useNavigate } from "@tanstack/react-router"
+import { Streamdown } from "streamdown"
 import {
   Bot,
   Building2,
@@ -11,6 +12,7 @@ import {
   DollarSign,
   ExternalLink,
   Footprints,
+  Loader2,
   MapPin,
   Navigation,
   SearchCheck,
@@ -27,6 +29,7 @@ import {
 import { AppMap } from "@/components/app-map"
 import type { AppMapHome, AppMapState } from "@/components/app-map"
 import { Badge } from "@/components/ui/badge"
+import { Bubble, BubbleContent } from "@/components/ui/bubble"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -43,8 +46,24 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupText,
+  InputGroupTextarea,
+} from "@/components/ui/input-group"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Message, MessageContent, MessageFooter } from "@/components/ui/message"
+import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from "@/components/ui/message-scroller"
 import {
   ResizableHandle,
   ResizablePanel,
@@ -53,7 +72,6 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Slider } from "@/components/ui/slider"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
   buildHomesFromDevelopments,
@@ -65,6 +83,7 @@ import {
   modes,
 } from "@/lib/housing-data"
 import type { HomeResult, Optimizer, TravelMode } from "@/lib/housing-data"
+import type { LatLng } from "@/lib/agent/geo"
 import { getBuildingReviewData } from "@/lib/building-reviews"
 import { getNeighborhoodSnapshot } from "@/lib/neighborhood-data"
 import type { RankedHousingMatch, ShowMapInput } from "@/lib/agent/schemas"
@@ -74,7 +93,6 @@ import type {
   TransportMode,
   WorkLocation,
 } from "@/domain"
-import { AgentMarkdown } from "@/components/agent-markdown"
 import { cn } from "@/lib/utils"
 
 const modeIcons = {
@@ -88,6 +106,13 @@ const DEFAULT_WORK_LOCATION = {
   label: destination,
   coordinates: [-87.633, 41.882] as [number, number],
 }
+
+// Bounds for the "Maximum commute" slider. Realistic transit trips start
+// around 13-15 minutes even for the closest listings once the new access-time
+// model is applied, so the floor sits at 15 and the ceiling stretches to 90 to
+// still surface the far South/North Side listings Danielle is comparing.
+const MIN_COMMUTE_MINUTES = 15
+const MAX_COMMUTE_MINUTES = 90
 
 // The agent's TransportMode is a superset of this demo's TravelMode (no
 // "bike" here, so it falls back to "walk" as the closest non-motorized mode).
@@ -104,7 +129,7 @@ export function HousingExplorer({
 }: {
   developments: HousingDevelopment[]
 }) {
-  const [maxMinutes, setMaxMinutes] = useState(20)
+  const [maxMinutes, setMaxMinutes] = useState(35)
   const [maxRent, setMaxRent] = useState(MAX_RENT)
   const [manualMode, setManualMode] = useState<TravelMode>("train")
   const [optimizer, setOptimizer] = useState<Optimizer | null>(null)
@@ -129,13 +154,24 @@ export function HousingExplorer({
       ),
     [realHomes, monthlyIncome, bedsNeeded]
   )
-  const explorer = useMemo(
-    () =>
-      optimizer
-        ? getOptimizedResults(optimizer, maxMinutes, maxRent, eligibleHomes)
-        : getManualResults(manualMode, maxMinutes, maxRent, eligibleHomes),
-    [manualMode, maxMinutes, maxRent, optimizer, eligibleHomes]
+  const workLatLng: LatLng = useMemo(
+    () => ({
+      lat: workLocation.coordinates[1],
+      lng: workLocation.coordinates[0],
+    }),
+    [workLocation]
   )
+  const explorer = useMemo(() => {
+    const query = {
+      maxMinutes,
+      maxRent,
+      work: workLatLng,
+      homeList: eligibleHomes,
+    }
+    return optimizer
+      ? getOptimizedResults(optimizer, query)
+      : getManualResults(manualMode, query)
+  }, [manualMode, maxMinutes, maxRent, optimizer, eligibleHomes, workLatLng])
   const activeMode = explorer.mode
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
@@ -143,14 +179,15 @@ export function HousingExplorer({
     "overview" | "reviews" | "neighborhood"
   >("overview")
   const detailTriggerRef = useRef<HTMLElement | null>(null)
-  const chatScrollRef = useRef<HTMLDivElement>(null)
   const matchesScrollRef = useRef<HTMLDivElement>(null)
   const {
+    error: chatError,
     messages: chatMessages,
     sendMessage: sendChatMessage,
     status: chatStatus,
   } = useChat()
   const [chatInput, setChatInput] = useState("")
+  const isChatBusy = chatStatus === "submitted" || chatStatus === "streaming"
 
   // Agent-produced app/map state lives in the URL (query params), not just
   // in this component's memory, so a reload/back-forward preserves it and
@@ -262,15 +299,6 @@ export function HousingExplorer({
     setSelectedId(agentMatches[0].housing.id)
   }, [agentMatches])
 
-  // Keep the chat thread pinned to the latest content — new messages and
-  // streamed tokens both update `chatMessages`, so this fires continuously
-  // while the agent is replying, not just when a full message completes.
-  useEffect(() => {
-    const container = chatScrollRef.current
-    if (!container) return
-    container.scrollTop = container.scrollHeight
-  }, [chatMessages])
-
   // Bring the selected home's card into view in the Matches list — e.g. after
   // selecting it from a map marker, the card may be scrolled out of sight.
   useEffect(() => {
@@ -310,8 +338,8 @@ export function HousingExplorer({
   }
 
   const submitChatMessage = () => {
-    if (!chatInput.trim() || chatStatus === "streaming") return
-    sendChatMessage({ text: chatInput })
+    if (!chatInput.trim() || isChatBusy) return
+    void sendChatMessage({ text: chatInput })
     setChatInput("")
   }
 
@@ -380,19 +408,29 @@ export function HousingExplorer({
       winnerId: isAgentDriven
         ? (agentMatches[0]?.housing.id ?? null)
         : explorer.winnerId,
-      isochrone:
-        activeMode === "walk"
-          ? undefined
-          : {
-              origin: workLocation,
-              mode: activeMode === "train" ? "transit" : "drive",
-              minutes: maxMinutes,
-            },
+      // Once the agent has results, only fit the viewport to the (real)
+      // work pin once the agent has actually determined one — otherwise a
+      // still-placeholder work location would pull the initial zoom away
+      // from the neighborhood the agent just searched.
+      hasKnownWorkLocation: isAgentDriven
+        ? latestAgentWorkLocation !== undefined
+        : true,
+      isochrone: {
+        origin: workLocation,
+        mode:
+          activeMode === "train"
+            ? "transit"
+            : activeMode === "walk"
+              ? "walk"
+              : "drive",
+        minutes: maxMinutes,
+      },
     }),
     [
       activeMode,
       agentMatches,
       isAgentDriven,
+      latestAgentWorkLocation,
       explorer.winnerId,
       mapHomes,
       neighborhoodGroups,
@@ -459,7 +497,7 @@ export function HousingExplorer({
                 defaultValue="filters"
                 className="flex h-full min-h-0 flex-col gap-0"
               >
-                <TabsList className="m-3 shrink-0">
+                <TabsList className="m-3 w-auto shrink-0">
                   <TabsTrigger value="filters">
                     <SlidersHorizontal data-icon="inline-start" /> Filters
                   </TabsTrigger>
@@ -509,8 +547,8 @@ export function HousingExplorer({
                     </div>
                     <Slider
                       aria-label="Maximum commute time in minutes"
-                      min={15}
-                      max={60}
+                      min={MIN_COMMUTE_MINUTES}
+                      max={MAX_COMMUTE_MINUTES}
                       step={5}
                       value={[maxMinutes]}
                       onValueChange={(value) =>
@@ -521,8 +559,8 @@ export function HousingExplorer({
                       className="mt-2 flex justify-between text-xs text-muted-foreground"
                       aria-hidden="true"
                     >
-                      <span>15 min</span>
-                      <span>60 min</span>
+                      <span>{MIN_COMMUTE_MINUTES} min</span>
+                      <span>{MAX_COMMUTE_MINUTES} min</span>
                     </div>
                   </section>
 
@@ -714,133 +752,178 @@ export function HousingExplorer({
                 <TabsContent
                   value="agent"
                   className="flex min-h-0 flex-1 flex-col"
-                  aria-labelledby="agent-title"
                 >
-                  <p
-                    id="agent-title"
-                    className="shrink-0 px-4 pb-2 text-xs text-muted-foreground"
-                  >
-                    Ask about commute, budget, or eligibility
-                  </p>
-
-                  <div
-                    ref={chatScrollRef}
-                    className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4"
-                  >
-                    {chatMessages.length === 0 && (
-                      <div className="flex items-start gap-2">
-                        <span
-                          className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
-                          aria-hidden="true"
+                  <MessageScrollerProvider autoScroll>
+                    <MessageScroller className="flex-1">
+                      <MessageScrollerViewport className="border-t">
+                        <MessageScrollerContent
+                          className="gap-4 p-4"
+                          aria-busy={chatStatus === "streaming"}
                         >
-                          <Bot className="size-3" />
-                        </span>
-                        <div className="flex flex-col items-start gap-2">
-                          <p className="rounded-lg bg-muted p-3 text-sm leading-6 text-foreground">
-                            Tell me about your commute, budget, and household —
-                            or check whether you qualify for affordable housing.
-                          </p>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={chatStatus === "streaming"}
-                            onClick={() =>
-                              sendChatMessage({ text: "See if I qualify" })
-                            }
-                          >
-                            <SearchCheck data-icon="inline-start" /> See if I
-                            qualify
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    {chatMessages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={cn(
-                          "flex items-start gap-2",
-                          message.role === "user" && "flex-row-reverse"
-                        )}
-                      >
-                        {message.role === "assistant" && (
-                          <span
-                            className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
-                            aria-hidden="true"
-                          >
-                            <Bot className="size-3" />
-                          </span>
-                        )}
-                        <div className="flex min-w-0 flex-1 flex-col gap-3">
-                          {message.parts.map((part, index) => {
-                            if (part.type === "text") {
-                              return (
-                                <div
-                                  key={`${message.id}-${index}`}
-                                  className={cn(
-                                    "rounded-lg p-3 text-sm",
-                                    message.role === "user"
-                                      ? "ml-auto max-w-[85%] bg-primary text-primary-foreground"
-                                      : "max-w-[85%] bg-muted text-foreground"
-                                  )}
-                                >
-                                  <AgentMarkdown>{part.text}</AgentMarkdown>
-                                </div>
-                              )
-                            }
-                            if (
-                              part.type === "tool-show_map" &&
-                              part.state === "output-available"
-                            ) {
-                              const payload = part.output as ShowMapInput
-                              return (
-                                <div
-                                  key={`${message.id}-${index}`}
-                                  className="flex flex-col gap-3"
-                                >
-                                  {payload.matches.map((match) => {
-                                    const workRoute = match.routes.find(
-                                      (route) => route.purpose === "work"
-                                    )
-                                    return (
-                                      <Card key={match.housing.id}>
-                                        <CardHeader>
-                                          <CardDescription>
-                                            {match.housing.communityArea ??
-                                              match.housing.propertyName}
-                                          </CardDescription>
-                                          <CardTitle className="text-sm">
-                                            {match.housing.address}
-                                          </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="text-sm text-muted-foreground">
-                                          {workRoute && (
-                                            <p>
-                                              {workRoute.durationMinutes} min by{" "}
-                                              {workRoute.mode} to work
-                                            </p>
-                                          )}
-                                          <div className="mt-2">
-                                            <AgentMarkdown>
-                                              {match.rationale}
-                                            </AgentMarkdown>
-                                          </div>
-                                        </CardContent>
-                                      </Card>
-                                    )
+                          {chatMessages.length === 0 && (
+                            <MessageScrollerItem messageId="agent-welcome">
+                              <Message>
+                                <MessageContent>
+                                  <Bubble variant="ghost">
+                                    <BubbleContent>
+                                      Tell me about your commute, budget, and
+                                      household — or check whether you qualify
+                                      for affordable housing.
+                                    </BubbleContent>
+                                  </Bubble>
+                                  <MessageFooter>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={isChatBusy}
+                                      onClick={() =>
+                                        void sendChatMessage({
+                                          text: "See if I qualify",
+                                        })
+                                      }
+                                    >
+                                      <SearchCheck data-icon="inline-start" />
+                                      See if I qualify
+                                    </Button>
+                                  </MessageFooter>
+                                </MessageContent>
+                              </Message>
+                            </MessageScrollerItem>
+                          )}
+                          {chatMessages.map((message) => (
+                            <MessageScrollerItem
+                              key={message.id}
+                              messageId={message.id}
+                              scrollAnchor={message.role === "user"}
+                            >
+                              <Message
+                                align={
+                                  message.role === "user" ? "end" : "start"
+                                }
+                              >
+                                <MessageContent>
+                                  {message.parts.map((part, index) => {
+                                    if (part.type === "text") {
+                                      return (
+                                        <Bubble
+                                          key={`${message.id}-${index}`}
+                                          variant={
+                                            message.role === "user"
+                                              ? "secondary"
+                                              : "ghost"
+                                          }
+                                        >
+                                          <BubbleContent>
+                                            {message.role === "assistant" ? (
+                                              <Streamdown>
+                                                {part.text}
+                                              </Streamdown>
+                                            ) : (
+                                              part.text
+                                            )}
+                                          </BubbleContent>
+                                        </Bubble>
+                                      )
+                                    }
+                                    if (
+                                      part.type === "tool-show_map" &&
+                                      part.state === "output-available"
+                                    ) {
+                                      const payload =
+                                        part.output as ShowMapInput
+                                      return (
+                                        <div
+                                          key={`${message.id}-${index}`}
+                                          className="flex flex-col gap-3"
+                                        >
+                                          {payload.matches.map((match) => {
+                                            const workRoute = match.routes.find(
+                                              (route) =>
+                                                route.purpose === "work"
+                                            )
+                                            return (
+                                              <Card key={match.housing.id}>
+                                                <CardHeader>
+                                                  <CardDescription>
+                                                    {match.housing
+                                                      .communityArea ??
+                                                      match.housing
+                                                        .propertyName}
+                                                  </CardDescription>
+                                                  <CardTitle className="text-sm">
+                                                    {match.housing.address}
+                                                  </CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="text-sm text-muted-foreground">
+                                                  {workRoute && (
+                                                    <p>
+                                                      {
+                                                        workRoute.durationMinutes
+                                                      }{" "}
+                                                      min by {workRoute.mode} to
+                                                      work
+                                                    </p>
+                                                  )}
+                                                  <div className="mt-2">
+                                                    <Streamdown>
+                                                      {match.rationale}
+                                                    </Streamdown>
+                                                  </div>
+                                                </CardContent>
+                                              </Card>
+                                            )
+                                          })}
+                                        </div>
+                                      )
+                                    }
+                                    return null
                                   })}
-                                </div>
-                              )
-                            }
-                            return null
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                                </MessageContent>
+                              </Message>
+                            </MessageScrollerItem>
+                          ))}
+                          {chatStatus === "submitted" && (
+                            <MessageScrollerItem messageId="agent-loading">
+                              <Message>
+                                <MessageContent>
+                                  <Bubble variant="ghost">
+                                    <BubbleContent
+                                      role="status"
+                                      aria-label="Agent is thinking"
+                                    >
+                                      <Loader2
+                                        className="animate-spin"
+                                        aria-hidden="true"
+                                      />
+                                    </BubbleContent>
+                                  </Bubble>
+                                </MessageContent>
+                              </Message>
+                            </MessageScrollerItem>
+                          )}
+                          {chatError && (
+                            <MessageScrollerItem messageId="agent-error">
+                              <Message>
+                                <MessageContent>
+                                  <Bubble variant="destructive">
+                                    <BubbleContent role="alert">
+                                      I couldn&apos;t finish that response.
+                                      Please try again.
+                                    </BubbleContent>
+                                  </Bubble>
+                                </MessageContent>
+                              </Message>
+                            </MessageScrollerItem>
+                          )}
+                        </MessageScrollerContent>
+                      </MessageScrollerViewport>
+                      <MessageScrollerButton />
+                    </MessageScroller>
+                  </MessageScrollerProvider>
 
                   <form
-                    className="grid shrink-0 grid-cols-[1fr_auto] gap-2 border-t p-3"
+                    className="shrink-0 p-3"
                     onSubmit={(event) => {
                       event.preventDefault()
                       submitChatMessage()
@@ -849,28 +932,40 @@ export function HousingExplorer({
                     <Label htmlFor="agent-message" className="sr-only">
                       Message the housing agent
                     </Label>
-                    <Textarea
-                      id="agent-message"
-                      className="min-h-16 resize-none"
-                      value={chatInput}
-                      onChange={(event) => setChatInput(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" && !event.shiftKey) {
-                          event.preventDefault()
-                          submitChatMessage()
-                        }
-                      }}
-                      placeholder="Message the housing agent"
-                      rows={2}
-                      disabled={chatStatus === "streaming"}
-                    />
-                    <Button
-                      className="h-16"
-                      type="submit"
-                      disabled={chatStatus === "streaming" || !chatInput.trim()}
-                    >
-                      <Send data-icon="inline-start" /> Send
-                    </Button>
+                    <InputGroup>
+                      <InputGroupTextarea
+                        id="agent-message"
+                        className="min-h-16"
+                        value={chatInput}
+                        onChange={(event) => setChatInput(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && !event.shiftKey) {
+                            event.preventDefault()
+                            submitChatMessage()
+                          }
+                        }}
+                        placeholder="Message the housing agent"
+                        rows={2}
+                        disabled={isChatBusy}
+                      />
+                      <InputGroupAddon
+                        align="block-end"
+                        className="justify-between"
+                      >
+                        <InputGroupText>
+                          Shift + Enter for a new line
+                        </InputGroupText>
+                        <InputGroupButton
+                          type="submit"
+                          variant="default"
+                          size="icon-sm"
+                          disabled={isChatBusy || !chatInput.trim()}
+                          aria-label="Send message"
+                        >
+                          <Send />
+                        </InputGroupButton>
+                      </InputGroupAddon>
+                    </InputGroup>
                   </form>
                 </TabsContent>
               </Tabs>
@@ -1004,7 +1099,10 @@ export function HousingExplorer({
                         tabIndex={0}
                         aria-pressed={selectedId === match.housing.id}
                         onClick={(event) =>
-                          handleHomeSelect(match.housing.id, event.currentTarget)
+                          handleHomeSelect(
+                            match.housing.id,
+                            event.currentTarget
+                          )
                         }
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
@@ -1023,7 +1121,9 @@ export function HousingExplorer({
                                 {match.housing.communityArea ??
                                   match.housing.propertyName}
                               </CardDescription>
-                              <CardTitle>{match.housing.propertyName}</CardTitle>
+                              <CardTitle>
+                                {match.housing.propertyName}
+                              </CardTitle>
                             </div>
                             {index === 0 && (
                               <Badge className="shrink-0">
@@ -1068,7 +1168,7 @@ export function HousingExplorer({
                               {workRoute.mode} to work
                             </p>
                           )}
-                          <AgentMarkdown>{match.rationale}</AgentMarkdown>
+                          <Streamdown>{match.rationale}</Streamdown>
                         </CardContent>
                       </Card>
                     )
@@ -1715,7 +1815,7 @@ function AgentMatchDetailPanel({
           >
             Why this match
           </h3>
-          <AgentMarkdown>{match.rationale}</AgentMarkdown>
+          <Streamdown>{match.rationale}</Streamdown>
         </section>
 
         <aside className="flex flex-col items-stretch gap-4 rounded-xl border bg-muted p-4">
