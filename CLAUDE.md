@@ -4,7 +4,7 @@ This repository is a Claude Impact Lab hackathon project. We are building for Da
 
 ## Design System
 
-Use the shadcn theme configured in `components.json` and `src/styles.css` as the product design system. Compose the existing components and design tokens without editing files in `src/components/ui/`.
+Use the shadcn theme configured in `components.json` and `src/styles.css` as the product design system. Compose the existing components and design tokens without editing files in `src/components/ui/`. Apply Tailwind utility classes directly to components for all application styling. Do not create custom utility classes; the only non-Tailwind classes allowed are those provided by MapCN or shadcn.
 
 ## Maps
 
