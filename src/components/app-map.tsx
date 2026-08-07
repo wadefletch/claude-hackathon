@@ -1,4 +1,4 @@
-import { useEffect, useId } from "react"
+import { useEffect, useId, useState } from "react"
 import type { MapLayerMouseEvent } from "maplibre-gl"
 import { Building2, Sparkles } from "lucide-react"
 
@@ -27,6 +27,18 @@ export type AppMapHome = AppMapLocation & {
   rent?: number
 }
 
+// A group of homes in one community area, rendered as a single bubble when
+// zoomed out (hybrid clustering).
+export type NeighborhoodGroup = {
+  name: string
+  coordinates: [number, number] // centroid [lng, lat]
+  count: number
+  homeIds: string[]
+}
+
+// Below this zoom, show neighborhood bubbles; at/above it, individual pins.
+const NEIGHBORHOOD_ZOOM_THRESHOLD = 12.5
+
 export type GroceryStoreSelection = {
   coordinates: [number, number]
   store_name?: string
@@ -43,6 +55,7 @@ export type IsochroneOptions = {
 export type AppMapState = {
   work: AppMapLocation
   homes: AppMapHome[]
+  neighborhoodGroups?: NeighborhoodGroup[]
   selectedHomeId: string | null
   winnerId: string | null
   showTransit: boolean
@@ -54,6 +67,7 @@ export type AppMapState = {
 export type AppMapProps = {
   state: AppMapState
   onHomeSelect: (home: AppMapHome, trigger: HTMLElement) => void
+  onNeighborhoodSelect?: (name: string) => void
   onGroceryStoreSelect: (store: GroceryStoreSelection | null) => void
   className?: string
 }
@@ -63,11 +77,13 @@ type GroceryStoreProperties = Omit<GroceryStoreSelection, "coordinates">
 export function AppMap({
   state,
   onHomeSelect,
+  onNeighborhoodSelect,
   onGroceryStoreSelect,
   className,
 }: AppMapProps) {
   const {
     homes,
+    neighborhoodGroups,
     work,
     selectedHomeId,
     winnerId,
@@ -115,15 +131,14 @@ export function AppMap({
             }}
           />
         )}
-        {homes.map((home) => (
-          <HomeMarker
-            key={home.id}
-            home={home}
-            isSelected={selectedHomeId === home.id}
-            isWinner={winnerId === home.id}
-            onSelect={onHomeSelect}
-          />
-        ))}
+        <HomesLayer
+          homes={homes}
+          groups={neighborhoodGroups}
+          selectedHomeId={selectedHomeId}
+          winnerId={winnerId}
+          onHomeSelect={onHomeSelect}
+          onNeighborhoodSelect={onNeighborhoodSelect}
+        />
         <WorkMarker location={work} />
         {showGroceryStores && (
           <GroceryStoresLayer onSelect={onGroceryStoreSelect} />
@@ -142,6 +157,124 @@ export function AppMap({
         />
       </Map>
     </section>
+  )
+}
+
+// Hybrid rendering: neighborhood bubbles when zoomed out, individual pins when
+// zoomed in. Clicking a bubble flies to that group's bounds (which crosses the
+// zoom threshold into pins) and notifies the parent to open its list panel.
+function HomesLayer({
+  homes,
+  groups,
+  selectedHomeId,
+  winnerId,
+  onHomeSelect,
+  onNeighborhoodSelect,
+}: {
+  homes: AppMapHome[]
+  groups?: NeighborhoodGroup[]
+  selectedHomeId: string | null
+  winnerId: string | null
+  onHomeSelect: (home: AppMapHome, trigger: HTMLElement) => void
+  onNeighborhoodSelect?: (name: string) => void
+}) {
+  const { map } = useMap()
+  const [zoom, setZoom] = useState(map?.getZoom() ?? 10)
+
+  useEffect(() => {
+    if (!map) return
+    const handleZoom = () => setZoom(map.getZoom())
+    handleZoom()
+    map.on("zoom", handleZoom)
+    return () => {
+      map.off("zoom", handleZoom)
+    }
+  }, [map])
+
+  const showGroups =
+    !!groups && groups.length > 0 && zoom < NEIGHBORHOOD_ZOOM_THRESHOLD
+
+  const flyToGroup = (group: NeighborhoodGroup) => {
+    const coordinates = homes
+      .filter((home) => group.homeIds.includes(home.id))
+      .map((home) => home.coordinates)
+    if (!map || coordinates.length === 0) return
+    const longitudes = coordinates.map(([lng]) => lng)
+    const latitudes = coordinates.map(([, lat]) => lat)
+    map.fitBounds(
+      [
+        [Math.min(...longitudes), Math.min(...latitudes)],
+        [Math.max(...longitudes), Math.max(...latitudes)],
+      ],
+      { padding: 80, maxZoom: 14.5, duration: 600 }
+    )
+  }
+
+  if (showGroups) {
+    return (
+      <>
+        {groups.map((group) => (
+          <NeighborhoodBubble
+            key={group.name}
+            group={group}
+            onClick={() => {
+              onNeighborhoodSelect?.(group.name)
+              flyToGroup(group)
+            }}
+          />
+        ))}
+      </>
+    )
+  }
+
+  return (
+    <>
+      {homes.map((home) => (
+        <HomeMarker
+          key={home.id}
+          home={home}
+          isSelected={selectedHomeId === home.id}
+          isWinner={winnerId === home.id}
+          onSelect={onHomeSelect}
+        />
+      ))}
+    </>
+  )
+}
+
+function NeighborhoodBubble({
+  group,
+  onClick,
+}: {
+  group: NeighborhoodGroup
+  onClick: () => void
+}) {
+  const size = Math.round(34 + Math.min(30, group.count * 1.6))
+  return (
+    <MapMarker
+      longitude={group.coordinates[0]}
+      latitude={group.coordinates[1]}
+      onClick={onClick}
+    >
+      <MarkerContent>
+        <button
+          type="button"
+          onClick={onClick}
+          className="flex flex-col items-center gap-1 focus-visible:outline-none"
+          aria-label={`${group.name}: ${group.count} homes`}
+        >
+          <span
+            className="grid place-items-center rounded-full border-2 border-primary-foreground bg-primary font-semibold text-primary-foreground shadow-md transition-transform hover:scale-105"
+            style={{ width: size, height: size }}
+          >
+            {group.count}
+          </span>
+          <span className="rounded bg-background/90 px-1.5 py-0.5 text-xs font-medium whitespace-nowrap shadow-sm">
+            {group.name}
+          </span>
+        </button>
+      </MarkerContent>
+    </MapMarker>
   )
 }
 
