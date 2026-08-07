@@ -821,6 +821,7 @@ export function HousingExplorer({
                                                   duration: 150,
                                                   easing: "ease-out",
                                                   sep: "char",
+                                                  stagger: 2,
                                                 }}
                                                 isAnimating={
                                                   message.id ===
