@@ -3,12 +3,13 @@ import { z } from "zod"
 
 import {
   AmenityCategory,
+  HOUSING_SODA_URL,
   parseSocrataHousing,
   ProfilePatch,
   TransportMode,
 } from "@/domain"
 import { mockHousingDetail } from "@/domain/detail"
-import type { SocrataHousingRow } from "@/domain/housing"
+import type { HousingDevelopment } from "@/domain/housing"
 import type { Route } from "@/domain/route"
 import {
   amiLimitForHouseholdSize,
@@ -18,9 +19,6 @@ import {
 } from "@/lib/agent/fixtures"
 import { estimateDurationMinutes, haversineMeters } from "@/lib/agent/geo"
 import { showMapInputSchema } from "@/lib/agent/schemas"
-
-const SOCRATA_ENDPOINT =
-  "https://data.cityofchicago.org/resource/s6ha-ppgi.json"
 
 function soqlList(values: string[]): string {
   return values.map((value) => `'${value.replace(/'/g, "''")}'`).join(",")
@@ -47,19 +45,15 @@ export const searchHousingDevelopments = tool({
       params.set("$where", clauses.join(" AND "))
     }
 
-    const response = await fetch(`${SOCRATA_ENDPOINT}?${params.toString()}`)
+    const response = await fetch(`${HOUSING_SODA_URL}?${params.toString()}`)
     if (!response.ok) {
       throw new Error(`Chicago open data request failed: ${response.status}`)
     }
-    const rows: SocrataHousingRow[] = await response.json()
+    const rows: unknown[] = await response.json()
 
     return rows
       .map(parseSocrataHousing)
-      .filter(
-        (development) =>
-          Number.isFinite(development.location.lat) &&
-          Number.isFinite(development.location.lng)
-      )
+      .filter((development): development is HousingDevelopment => development !== null)
   },
 })
 
