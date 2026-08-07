@@ -43,6 +43,19 @@ describe("agent system prompt", () => {
     expect(AGENT_SYSTEM_PROMPT).toContain("in parallel")
   })
 
+  it("drives the map live off a bare anchor instead of waiting for every preference", () => {
+    expect(AGENT_SYSTEM_PROMPT).toContain(
+      "search and call show_map right away with whatever you can determine"
+    )
+    expect(AGENT_SYSTEM_PROMPT).toContain(
+      "never treat show_map as a one-time \"final\" action"
+    )
+  })
+
+  it("tells the model to attach rentUsd/bedrooms so the UI doesn't need to parse prose", () => {
+    expect(AGENT_SYSTEM_PROMPT).toContain("rentUsd and bedrooms")
+  })
+
   it("references every available tool by name", () => {
     for (const toolName of [
       "searchHousingDevelopments",
