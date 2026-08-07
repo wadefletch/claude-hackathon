@@ -4,6 +4,8 @@ QualiFind is a web app that simplifies the search for subsidized housing in Chic
 
 Built for Claude Community.
 
+**Live demo:** https://claude-hackathon-theta.vercel.app
+
 ## Problem
 
 Chicago residents who qualify for subsidized housing have a hard time finding it. Section 8, CHA, and IHDA all have different eligibility rules, different websites, and different application processes. Even after finding a unit, there's no easy way to tell if it's near your job, a decent school, or a park.
@@ -13,7 +15,7 @@ Chicago residents who qualify for subsidized housing have a hard time finding it
 - Enter household size and income to check eligibility based on AMI thresholds
 - Browse listings on a map, matched to priorities like work, schools, parks, and transit
 - Click a listing to see details and reviews pulled from public sources
-- Get pointed to the right agency (CHA / IHDA) to actually apply — QualiFind isn't an application portal, it's the step before one
+- Get pointed to the right agency (CHA / IHDA) to actually apply 
 
 ## How it works
 
@@ -21,14 +23,17 @@ No database. A user's profile (household, income, priorities) is a JSON object v
 
 ## Data sources
 
-- [Chicago Open Data — Affordable Rental Housing Developments](https://data.cityofchicago.org/resource/s6ha-ppgi.json)
+- [Affordable Rental Housing Developments](https://data.cityofchicago.org/resource/s6ha-ppgi.json) — Chicago Open Data
+- [Grocery Store Status Map](https://data.cityofchicago.org/Health-Human-Services/Grocery-Store-Status-Map-Historical/rish-pa6g) — Chicago Open Data
+- [Chicago Park District Properties](https://data.cityofchicago.org/Parks-Recreation/CPD_Parks/ejsh-fztr/about_data) — Chicago Open Data
 - Chicago Public Schools — School Locations
-- Chicago Open Data + OpenStreetMap (amenities)
 - CTA GTFS (transit stops)
+- [Chicago Data Portal](https://data.cityofchicago.org/browse?sortBy=relevance&pageSize=20) — full catalog
 
 ## Tech stack
 
-TanStack Start, React 19, Tailwind v4, shadcn/ui, Zod, MapLibre (via Mapcn), Claude, Vervcel
+TanStack Start, React 19, Tailwind v4, shadcn/ui, [Zod](https://zod.dev), [MapLibre](https://maplibre.org/) (via Mapcn), Claude, deployed on Vercel
+
 
 
 # TanStack Start + shadcn/ui
