@@ -738,3 +738,89 @@
   .workspace { padding-inline: 0; }
   .chicago-map { height: 440px; }
 }
+
+/* Building details are presented as a centered modal over the search workspace. */
+@layer components {
+  .building-detail-dialog {
+    position: fixed;
+    inset: 50% auto auto 50%;
+    width: min(960px, calc(100vw - 2rem));
+    max-width: none;
+    max-height: calc(100dvh - 2rem);
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    border-radius: 1rem;
+    background: white;
+    color: #183126;
+    box-shadow: 0 24px 80px rgb(12 36 25 / 0.3);
+    transform: translate(-50%, -50%);
+  }
+  .building-detail-dialog::backdrop {
+    background: rgb(10 28 20 / 0.58);
+    backdrop-filter: blur(3px);
+  }
+  .building-detail-dialog .building-detail {
+    display: flex;
+    max-width: none;
+    max-height: calc(100dvh - 2rem);
+    margin: 0;
+    flex-direction: column;
+    overflow: hidden;
+    border: 0;
+    border-radius: 0;
+    background: white;
+    box-shadow: none;
+  }
+  .building-detail-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 0.55rem;
+  }
+  .building-detail-close {
+    border: 1px solid rgb(29 73 52 / 0.12);
+    color: #526b5e;
+  }
+  .building-detail-body { overflow-y: auto; }
+  .housing-application-callout {
+    display: flex;
+    grid-column: 1 / -1;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid rgb(39 112 78 / 0.16);
+    border-radius: 0.8rem;
+    background: #edf6ef;
+  }
+  .housing-application-callout h3 { color: #214b36; font-size: 0.78rem; font-weight: 720; }
+  .housing-application-callout p { max-width: 620px; margin-top: 0.2rem; color: #64776c; font-size: 0.65rem; line-height: 1.5; }
+  .housing-application-callout a { display: inline-flex; flex: 0 0 auto; min-height: 2.35rem; align-items: center; gap: 0.4rem; padding: 0 0.8rem; border-radius: 0.5rem; background: #276e4c; color: white; font-size: 0.68rem; font-weight: 700; text-decoration: none; }
+  .neighborhood-panel { display: grid; gap: 1rem; }
+  .neighborhood-intro h3 { margin: 0.15rem 0 0.25rem; color: #1d4933; font-size: 1.05rem; font-weight: 730; }
+  .neighborhood-intro p { max-width: 760px; color: #687b70; font-size: 0.72rem; line-height: 1.6; }
+  .neighborhood-kicker { display: inline-flex; align-items: center; gap: 0.3rem; color: #428064; font-size: 0.57rem; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
+  .neighborhood-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; }
+  .neighborhood-columns > section { display: flex; gap: 0.75rem; padding: 0.9rem; border: 1px solid rgb(27 67 48 / 0.1); border-radius: 0.75rem; background: white; }
+  .neighborhood-columns h4 { margin-bottom: 0.35rem; color: #294c3a; font-size: 0.72rem; font-weight: 720; }
+  .neighborhood-columns ul { display: grid; gap: 0.25rem; padding-left: 1rem; color: #708078; font-size: 0.65rem; line-height: 1.45; }
+  .neighborhood-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; border: 1px solid rgb(27 67 48 / 0.1); border-radius: 0.75rem; background: #f5f8f5; }
+  .neighborhood-facts > div { padding: 0.75rem 0.9rem; }
+  .neighborhood-facts > div + div { border-left: 1px solid rgb(27 67 48 / 0.1); }
+  .neighborhood-facts dt { margin-bottom: 0.2rem; color: #7d8b83; font-size: 0.53rem; font-weight: 720; letter-spacing: 0.06em; text-transform: uppercase; }
+  .neighborhood-facts dd { color: #274d39; font-size: 0.68rem; font-weight: 680; }
+  .review-byline { display: flex; align-items: center; gap: 0.4rem; margin: 0.85rem 0 0.55rem; color: #76847c; font-size: 0.59rem; }
+  .review-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.85rem; }
+}
+
+@media (max-width: 520px) {
+  .building-detail-dialog { width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); }
+  .building-detail-dialog .building-detail { max-height: calc(100dvh - 1rem); }
+  .building-detail-actions { align-items: flex-end; flex-direction: column-reverse; }
+  .housing-application-callout { align-items: stretch; flex-direction: column; }
+  .housing-application-callout a { justify-content: center; }
+  .neighborhood-columns, .neighborhood-facts { grid-template-columns: 1fr; }
+  .neighborhood-facts > div + div { border-top: 1px solid rgb(27 67 48 / 0.1); border-left: 0; }
+}
