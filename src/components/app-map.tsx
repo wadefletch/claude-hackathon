@@ -12,6 +12,7 @@ import {
   MarkerLabel,
   useMap,
 } from "@/components/ui/map"
+import { TransitLayers } from "@/components/transit-layers"
 import { useGeoapifyIsochrone } from "@/hooks/use-geoapify-isochrone"
 import type { IsochroneMode } from "@/hooks/use-geoapify-isochrone"
 import { cn } from "@/lib/utils"
@@ -44,6 +45,7 @@ export type AppMapState = {
   homes: AppMapHome[]
   selectedHomeId: string | null
   winnerId: string | null
+  showTransit: boolean
   showGroceryStores: boolean
   selectedGroceryStore: GroceryStoreSelection | null
   isochrone?: IsochroneOptions
@@ -69,6 +71,7 @@ export function AppMap({
     work,
     selectedHomeId,
     winnerId,
+    showTransit,
     showGroceryStores,
     selectedGroceryStore,
     isochrone,
@@ -97,6 +100,7 @@ export function AppMap({
     >
       <Map loading={isIsochroneLoading}>
         <MapControls showCompass showFullscreen />
+        {showTransit && <TransitLayers />}
         {isochroneData && (
           <MapGeoJSON
             id="travel-time-isochrone"
