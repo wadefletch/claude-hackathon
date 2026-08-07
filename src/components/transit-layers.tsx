@@ -20,29 +20,10 @@ const TRANSIT_LAYER_IDS = [
 const CTA_ATTRIBUTION =
   "Chicago Transit Authority via City of Chicago Data Portal"
 
-const ROAD_LAYER_PATTERN =
-  /road|street|motorway|highway|transport|tunnel|bridge/i
-
-function getLayerAboveRoads(
+function getFirstLabelLayer(
   map: NonNullable<ReturnType<typeof useMap>["map"]>
 ) {
-  const layers = map.getStyle().layers
-
-  for (let index = layers.length - 1; index >= 0; index -= 1) {
-    const layer = layers[index]
-    if (layer.type !== "line") continue
-
-    const sourceLayer =
-      "source-layer" in layer && typeof layer["source-layer"] === "string"
-        ? layer["source-layer"]
-        : ""
-
-    if (ROAD_LAYER_PATTERN.test(`${layer.id} ${sourceLayer}`)) {
-      return layers[index + 1]?.id
-    }
-  }
-
-  return layers.find((layer) => layer.type === "symbol")?.id
+  return map.getStyle().layers.find((layer) => layer.type === "symbol")?.id
 }
 
 function chicagoGeoJson(datasetId: string, fields: string[]) {
@@ -85,7 +66,9 @@ export function TransitLayers() {
   useEffect(() => {
     if (!map || !isLoaded) return
 
-    const layerAboveRoads = getLayerAboveRoads(map)
+    // Keep transit above every basemap geometry layer, including buildings,
+    // while preserving basemap labels above the overlay.
+    const firstLabelLayer = getFirstLabelLayer(map)
 
     map.addSource("cta-bus-routes", {
       type: "geojson",
@@ -124,7 +107,7 @@ export function TransitLayers() {
           "line-width": ["interpolate", ["linear"], ["zoom"], 9, 1, 14, 2.5],
         },
       },
-      layerAboveRoads
+      firstLabelLayer
     )
 
     map.addLayer(
@@ -143,7 +126,7 @@ export function TransitLayers() {
           "line-width": ["interpolate", ["linear"], ["zoom"], 8, 4, 14, 7],
         },
       },
-      layerAboveRoads
+      firstLabelLayer
     )
 
     map.addLayer(
@@ -181,7 +164,7 @@ export function TransitLayers() {
           "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2.5, 14, 5],
         },
       },
-      layerAboveRoads
+      firstLabelLayer
     )
 
     map.addLayer(
@@ -197,7 +180,7 @@ export function TransitLayers() {
           "circle-stroke-width": 1.5,
         },
       },
-      layerAboveRoads
+      firstLabelLayer
     )
 
     map.addLayer(
@@ -213,7 +196,7 @@ export function TransitLayers() {
           "circle-stroke-width": 1.5,
         },
       },
-      layerAboveRoads
+      firstLabelLayer
     )
 
     return () => {
