@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useChat } from "@ai-sdk/react"
 import { useNavigate } from "@tanstack/react-router"
 import { Streamdown } from "streamdown"
-import "streamdown/styles.css"
 import {
   Bot,
   Building2,
@@ -122,6 +121,61 @@ const AGENT_MODE_TO_TRAVEL_MODE: Record<TransportMode, TravelMode> = {
   walk: "walk",
   bike: "walk",
   rideshare: "rideshare",
+}
+
+function SmoothStreamdown({ text, active }: { text: string; active: boolean }) {
+  const [visibleText, setVisibleText] = useState(active ? "" : text)
+  const visibleTextRef = useRef(active ? "" : text)
+  const hasStreamedRef = useRef(active)
+
+  useEffect(() => {
+    if (active) hasStreamedRef.current = true
+
+    if (
+      !hasStreamedRef.current ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      visibleTextRef.current = text
+      setVisibleText(text)
+      return
+    }
+
+    // Model output should only grow. If the provider replaces earlier text,
+    // show the corrected value immediately instead of visibly rewinding it.
+    if (!text.startsWith(visibleTextRef.current)) {
+      visibleTextRef.current = text
+      setVisibleText(text)
+      return
+    }
+
+    const remaining = text.length - visibleTextRef.current.length
+    if (remaining <= 0) return
+
+    // Spread each incoming provider chunk over several display frames. This
+    // keeps the reveal finer than the network chunks without animating each
+    // Markdown block independently.
+    const charactersPerFrame = Math.max(1, Math.ceil(remaining / 8))
+    let animationFrame: number
+
+    const revealNextCharacters = () => {
+      const nextLength = Math.min(
+        text.length,
+        visibleTextRef.current.length + charactersPerFrame
+      )
+      const nextText = text.slice(0, nextLength)
+      visibleTextRef.current = nextText
+      setVisibleText(nextText)
+
+      if (nextLength < text.length) {
+        animationFrame = requestAnimationFrame(revealNextCharacters)
+      }
+    }
+
+    animationFrame = requestAnimationFrame(revealNextCharacters)
+    return () => cancelAnimationFrame(animationFrame)
+  }, [active, text])
+
+  return <Streamdown>{visibleText}</Streamdown>
 }
 
 export function HousingExplorer({
@@ -815,21 +869,13 @@ export function HousingExplorer({
                                         >
                                           <BubbleContent>
                                             {message.role === "assistant" ? (
-                                              <Streamdown
-                                                animated={{
-                                                  animation: "fadeIn",
-                                                  duration: 150,
-                                                  easing: "ease-out",
-                                                  sep: "char",
-                                                  stagger: 2,
-                                                }}
-                                                isAnimating={
+                                              <SmoothStreamdown
+                                                active={
                                                   message.id ===
                                                   streamingMessageId
                                                 }
-                                              >
-                                                {part.text}
-                                              </Streamdown>
+                                                text={part.text}
+                                              />
                                             ) : (
                                               part.text
                                             )}
