@@ -21,6 +21,11 @@ const CITY_ATTRIBUTION = "City of Chicago Data Portal"
 
 type DataLayerProperties = Record<string, unknown>
 
+type ChicagoDataLayerProps = {
+  beforeId: string
+  onSelect: (feature: MapDataLayerFeature) => void
+}
+
 type LayerSourceDefinition = {
   key: string
   data: string
@@ -36,12 +41,6 @@ type StaticLayerDefinition = {
     properties: DataLayerProperties,
     event: MapLayerMouseEvent
   ) => MapDataLayerFeature
-}
-
-function getFirstLabelLayer(
-  map: NonNullable<ReturnType<typeof useMap>["map"]>
-) {
-  return map.getStyle().layers.find((layer) => layer.type === "symbol")?.id
 }
 
 function featureCoordinates(event: MapLayerMouseEvent): [number, number] {
@@ -67,9 +66,11 @@ function number(value: unknown) {
 }
 
 function StaticChicagoDataLayer({
+  beforeId,
   definition,
   onSelect,
 }: {
+  beforeId: string
   definition: StaticLayerDefinition
   onSelect: (feature: MapDataLayerFeature) => void
 }) {
@@ -104,7 +105,6 @@ function StaticChicagoDataLayer({
       }
       if (cancelled) return
 
-      const firstLabelLayer = getFirstLabelLayer(mapInstance)
       for (const source of definition.sources) {
         const sourceId = `${definition.id}-${source.key}-source-${instanceId}`
         const layerIdPrefix = `${definition.id}-${source.key}-${instanceId}`
@@ -118,7 +118,7 @@ function StaticChicagoDataLayer({
         sourceIds.push(sourceId)
 
         for (const layer of layers) {
-          mapInstance.addLayer(layer, firstLabelLayer)
+          mapInstance.addLayer(layer, beforeId)
           layerIds.push(layer.id)
         }
 
@@ -152,7 +152,7 @@ function StaticChicagoDataLayer({
       }
       mapInstance.getCanvas().style.cursor = ""
     }
-  }, [definition, instanceId, isLoaded, map, onSelect])
+  }, [beforeId, definition, instanceId, isLoaded, map, onSelect])
 
   return null
 }
@@ -561,23 +561,23 @@ const COMMUNITY_AREAS_DEFINITION: StaticLayerDefinition = {
   }),
 }
 
-export function ParksDataLayer({
-  onSelect,
-}: {
-  onSelect: (feature: MapDataLayerFeature) => void
-}) {
+export function ParksDataLayer({ beforeId, onSelect }: ChicagoDataLayerProps) {
   return (
-    <StaticChicagoDataLayer definition={PARKS_DEFINITION} onSelect={onSelect} />
+    <StaticChicagoDataLayer
+      beforeId={beforeId}
+      definition={PARKS_DEFINITION}
+      onSelect={onSelect}
+    />
   )
 }
 
 export function SchoolsDataLayer({
+  beforeId,
   onSelect,
-}: {
-  onSelect: (feature: MapDataLayerFeature) => void
-}) {
+}: ChicagoDataLayerProps) {
   return (
     <StaticChicagoDataLayer
+      beforeId={beforeId}
       definition={SCHOOLS_DEFINITION}
       onSelect={onSelect}
     />
@@ -585,12 +585,12 @@ export function SchoolsDataLayer({
 }
 
 export function SchoolBoundariesDataLayer({
+  beforeId,
   onSelect,
-}: {
-  onSelect: (feature: MapDataLayerFeature) => void
-}) {
+}: ChicagoDataLayerProps) {
   return (
     <StaticChicagoDataLayer
+      beforeId={beforeId}
       definition={SCHOOL_BOUNDARIES_DEFINITION}
       onSelect={onSelect}
     />
@@ -598,12 +598,12 @@ export function SchoolBoundariesDataLayer({
 }
 
 export function LibrariesDataLayer({
+  beforeId,
   onSelect,
-}: {
-  onSelect: (feature: MapDataLayerFeature) => void
-}) {
+}: ChicagoDataLayerProps) {
   return (
     <StaticChicagoDataLayer
+      beforeId={beforeId}
       definition={LIBRARIES_DEFINITION}
       onSelect={onSelect}
     />
@@ -611,22 +611,25 @@ export function LibrariesDataLayer({
 }
 
 export function DivvyStationsDataLayer({
+  beforeId,
   onSelect,
-}: {
-  onSelect: (feature: MapDataLayerFeature) => void
-}) {
+}: ChicagoDataLayerProps) {
   return (
-    <StaticChicagoDataLayer definition={DIVVY_DEFINITION} onSelect={onSelect} />
+    <StaticChicagoDataLayer
+      beforeId={beforeId}
+      definition={DIVVY_DEFINITION}
+      onSelect={onSelect}
+    />
   )
 }
 
 export function BikeRoutesDataLayer({
+  beforeId,
   onSelect,
-}: {
-  onSelect: (feature: MapDataLayerFeature) => void
-}) {
+}: ChicagoDataLayerProps) {
   return (
     <StaticChicagoDataLayer
+      beforeId={beforeId}
       definition={BIKE_ROUTES_DEFINITION}
       onSelect={onSelect}
     />
@@ -634,12 +637,12 @@ export function BikeRoutesDataLayer({
 }
 
 export function CommunityAreasDataLayer({
+  beforeId,
   onSelect,
-}: {
-  onSelect: (feature: MapDataLayerFeature) => void
-}) {
+}: ChicagoDataLayerProps) {
   return (
     <StaticChicagoDataLayer
+      beforeId={beforeId}
       definition={COMMUNITY_AREAS_DEFINITION}
       onSelect={onSelect}
     />
@@ -647,10 +650,9 @@ export function CommunityAreasDataLayer({
 }
 
 export function BuildingViolationsDataLayer({
+  beforeId,
   onSelect,
-}: {
-  onSelect: (feature: MapDataLayerFeature) => void
-}) {
+}: ChicagoDataLayerProps) {
   const { map, isLoaded } = useMap()
   const instanceId = useId()
 
@@ -756,7 +758,7 @@ export function BuildingViolationsDataLayer({
               "icon-padding": 2,
             },
           },
-          getFirstLabelLayer(mapInstance)
+          beforeId
         )
 
         mapInstance.on("click", layerId, handleClick)
@@ -780,7 +782,7 @@ export function BuildingViolationsDataLayer({
       if (mapInstance.getSource(sourceId)) mapInstance.removeSource(sourceId)
       mapInstance.getCanvas().style.cursor = ""
     }
-  }, [instanceId, isLoaded, map, onSelect])
+  }, [beforeId, instanceId, isLoaded, map, onSelect])
 
   return null
 }

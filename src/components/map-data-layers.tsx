@@ -4,7 +4,6 @@ import type { MapLayerMouseEvent } from "maplibre-gl"
 import {
   Bike,
   BusFront,
-  Layers3,
   Library,
   Map as MapIcon,
   Route,
@@ -27,21 +26,22 @@ import {
   SchoolsDataLayer,
 } from "@/components/chicago-data-layers"
 import { TransitLayers } from "@/components/transit-layers"
-import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field"
 import { useMap } from "@/components/ui/map"
+import { Switch } from "@/components/ui/switch"
 import {
   dataSourceMarkerImageId,
   registerDataSourceMarkerIcons,
 } from "@/lib/map-data-source-icons"
+import { MAP_LAYER_ANCHOR_IDS } from "@/lib/map-layer-order"
+import type { MapLayerPlacement } from "@/lib/map-layer-order"
 
 export type MapDataLayerFeature = {
   layerId: string
@@ -51,6 +51,7 @@ export type MapDataLayerFeature = {
 }
 
 type MapDataLayerComponentProps = {
+  beforeId: string
   onSelect: (feature: MapDataLayerFeature) => void
 }
 
@@ -61,11 +62,12 @@ type MapDataLayerDefinition = {
   icon: LucideIcon
   group: "essentials" | "mobility" | "context"
   defaultVisible: boolean
+  placement: MapLayerPlacement
   component: ComponentType<MapDataLayerComponentProps>
 }
 
-function TransitDataLayer() {
-  return <TransitLayers />
+function TransitDataLayer({ beforeId }: MapDataLayerComponentProps) {
+  return <TransitLayers beforeId={beforeId} />
 }
 
 /**
@@ -80,6 +82,7 @@ export const MAP_DATA_LAYERS = [
     icon: BusFront,
     group: "mobility",
     defaultVisible: false,
+    placement: "transit",
     component: TransitDataLayer,
   },
   {
@@ -89,6 +92,7 @@ export const MAP_DATA_LAYERS = [
     icon: ShoppingBasket,
     group: "essentials",
     defaultVisible: true,
+    placement: "foreground",
     component: GroceryStoresDataLayer,
   },
   {
@@ -98,6 +102,7 @@ export const MAP_DATA_LAYERS = [
     icon: Trees,
     group: "essentials",
     defaultVisible: false,
+    placement: "coverage",
     component: ParksDataLayer,
   },
   {
@@ -107,6 +112,7 @@ export const MAP_DATA_LAYERS = [
     icon: School,
     group: "essentials",
     defaultVisible: false,
+    placement: "foreground",
     component: SchoolsDataLayer,
   },
   {
@@ -116,6 +122,7 @@ export const MAP_DATA_LAYERS = [
     icon: Library,
     group: "essentials",
     defaultVisible: false,
+    placement: "foreground",
     component: LibrariesDataLayer,
   },
   {
@@ -125,6 +132,7 @@ export const MAP_DATA_LAYERS = [
     icon: Bike,
     group: "mobility",
     defaultVisible: false,
+    placement: "foreground",
     component: DivvyStationsDataLayer,
   },
   {
@@ -134,6 +142,7 @@ export const MAP_DATA_LAYERS = [
     icon: Route,
     group: "mobility",
     defaultVisible: false,
+    placement: "transit",
     component: BikeRoutesDataLayer,
   },
   {
@@ -144,6 +153,7 @@ export const MAP_DATA_LAYERS = [
     icon: Shapes,
     group: "context",
     defaultVisible: false,
+    placement: "coverage",
     component: SchoolBoundariesDataLayer,
   },
   {
@@ -153,6 +163,7 @@ export const MAP_DATA_LAYERS = [
     icon: MapIcon,
     group: "context",
     defaultVisible: false,
+    placement: "coverage",
     component: CommunityAreasDataLayer,
   },
   {
@@ -163,6 +174,7 @@ export const MAP_DATA_LAYERS = [
     icon: TriangleAlert,
     group: "context",
     defaultVisible: false,
+    placement: "foreground",
     component: BuildingViolationsDataLayer,
   },
 ] as const satisfies readonly MapDataLayerDefinition[]
@@ -187,6 +199,7 @@ export function MapDataLayers({
     visibleLayers.has(layer.id)
       ? createElement(layer.component, {
           key: layer.id,
+          beforeId: MAP_LAYER_ANCHOR_IDS[layer.placement],
           onSelect: onFeatureSelect,
         })
       : null
@@ -200,6 +213,7 @@ export function MapDataLayerControls({
   visibleLayerIds: readonly MapDataLayerId[]
   onVisibleLayerIdsChange: (layerIds: MapDataLayerId[]) => void
 }) {
+  const controlId = useId()
   const visibleLayers = new Set(visibleLayerIds)
   const setLayerVisibility = (layerId: MapDataLayerId, visible: boolean) => {
     onVisibleLayerIdsChange(
@@ -210,45 +224,49 @@ export function MapDataLayerControls({
   }
 
   return (
-    <div className="absolute top-2 left-2 z-10">
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={<Button variant="outline" size="sm" className="shadow-sm" />}
-        >
-          <Layers3 data-icon="inline-start" />
-          Layers ({visibleLayerIds.length})
-        </DropdownMenuTrigger>
-        <DropdownMenuContent className="min-w-64">
-          {MAP_DATA_LAYER_GROUPS.map((group, groupIndex) => (
-            <div key={group.id}>
-              {groupIndex > 0 && <DropdownMenuSeparator />}
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+    <Card size="sm" className="absolute top-2 left-2 z-10 w-56 shadow-sm">
+      <CardHeader>
+        <CardTitle>Map layers</CardTitle>
+      </CardHeader>
+      <CardContent className="max-h-64 overflow-y-auto">
+        <FieldGroup className="gap-3">
+          {MAP_DATA_LAYER_GROUPS.map((group) => (
+            <FieldSet key={group.id} className="gap-2">
+              <FieldLegend variant="label">{group.label}</FieldLegend>
+              <FieldGroup className="gap-2">
                 {MAP_DATA_LAYERS.filter(
                   (layer) => layer.group === group.id
                 ).map((layer) => {
                   const Icon = layer.icon
-                  const checked = visibleLayers.has(layer.id)
+                  const switchId = `${controlId}-${layer.id}`
+
                   return (
-                    <DropdownMenuCheckboxItem
-                      key={layer.id}
-                      checked={checked}
-                      onCheckedChange={(nextChecked) =>
-                        setLayerVisibility(layer.id, nextChecked === true)
-                      }
-                      aria-label={`${checked ? "Hide" : "Show"} ${layer.description}`}
-                    >
-                      <Icon />
-                      {layer.label}
-                    </DropdownMenuCheckboxItem>
+                    <Field key={layer.id} orientation="horizontal">
+                      <FieldLabel
+                        htmlFor={switchId}
+                        title={layer.description}
+                        className="font-normal"
+                      >
+                        <Icon data-icon="inline-start" size={16} />
+                        {layer.label}
+                      </FieldLabel>
+                      <Switch
+                        id={switchId}
+                        size="sm"
+                        checked={visibleLayers.has(layer.id)}
+                        onCheckedChange={(checked) =>
+                          setLayerVisibility(layer.id, checked)
+                        }
+                      />
+                    </Field>
                   )
                 })}
-              </DropdownMenuGroup>
-            </div>
+              </FieldGroup>
+            </FieldSet>
           ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+        </FieldGroup>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -264,7 +282,10 @@ type GroceryStoreProperties = {
   new_status?: string
 }
 
-function GroceryStoresDataLayer({ onSelect }: MapDataLayerComponentProps) {
+function GroceryStoresDataLayer({
+  beforeId,
+  onSelect,
+}: MapDataLayerComponentProps) {
   const { map, isLoaded } = useMap()
   const id = useId()
   const sourceId = `grocery-stores-source-${id}`
@@ -309,25 +330,36 @@ function GroceryStoresDataLayer({ onSelect }: MapDataLayerComponentProps) {
         data: "/data/grocery-store-status-historical.geojson",
       })
 
-      map.addLayer({
-        id: layerId,
-        type: "symbol",
-        source: sourceId,
-        layout: {
-          "icon-image": [
-            "match",
-            ["get", "new_status"],
-            "CLOSED",
-            dataSourceMarkerImageId("groceryStoreClosed"),
-            "ONLINE ORDERS ONLY",
-            dataSourceMarkerImageId("groceryStoreLimited"),
-            dataSourceMarkerImageId("groceryStore"),
-          ],
-          "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 0.68, 14, 0.94],
-          "icon-allow-overlap": false,
-          "icon-padding": 2,
+      map.addLayer(
+        {
+          id: layerId,
+          type: "symbol",
+          source: sourceId,
+          layout: {
+            "icon-image": [
+              "match",
+              ["get", "new_status"],
+              "CLOSED",
+              dataSourceMarkerImageId("groceryStoreClosed"),
+              "ONLINE ORDERS ONLY",
+              dataSourceMarkerImageId("groceryStoreLimited"),
+              dataSourceMarkerImageId("groceryStore"),
+            ],
+            "icon-size": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              9,
+              0.68,
+              14,
+              0.94,
+            ],
+            "icon-allow-overlap": false,
+            "icon-padding": 2,
+          },
         },
-      })
+        beforeId
+      )
 
       map.on("click", layerId, handleClick)
       map.on("mouseenter", layerId, handleMouseEnter)
@@ -345,7 +377,7 @@ function GroceryStoresDataLayer({ onSelect }: MapDataLayerComponentProps) {
       if (map.getSource(sourceId)) map.removeSource(sourceId)
       map.getCanvas().style.cursor = ""
     }
-  }, [isLoaded, layerId, map, onSelect, sourceId])
+  }, [beforeId, isLoaded, layerId, map, onSelect, sourceId])
 
   return null
 }

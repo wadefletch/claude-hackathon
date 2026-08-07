@@ -7,6 +7,7 @@ import {
   MapDataLayerControls,
   MapDataLayers,
 } from "@/components/map-data-layers"
+import { MapLayerAnchors } from "@/components/map-layer-anchors"
 import type {
   MapDataLayerFeature,
   MapDataLayerId,
@@ -29,6 +30,7 @@ import {
   pendingIsochronePatternExpression,
   registerPendingIsochronePatterns,
 } from "@/lib/isochrone-pattern"
+import { MAP_LAYER_ANCHOR_IDS } from "@/lib/map-layer-order"
 import { cn } from "@/lib/utils"
 
 export type AppMapLocation = {
@@ -146,17 +148,19 @@ export function AppMap({
           visibleLayerIds={visibleLayerIds}
           onVisibleLayerIdsChange={setLayerVisibilities}
         />
-        <MapDataLayers
-          visibleLayerIds={visibleLayerIds}
-          onFeatureSelect={setSelectedDataLayerFeature}
-        />
-        {isochrone && isochroneData && (
-          <AnimatedIsochroneLayer
-            data={isochroneData}
-            color={isochroneColor}
-            isStale={isIsochroneStale}
+        <MapLayerAnchors>
+          <MapDataLayers
+            visibleLayerIds={visibleLayerIds}
+            onFeatureSelect={setSelectedDataLayerFeature}
           />
-        )}
+          {isochrone && isochroneData && (
+            <AnimatedIsochroneLayer
+              data={isochroneData}
+              color={isochroneColor}
+              isStale={isIsochroneStale}
+            />
+          )}
+        </MapLayerAnchors>
         <HomesLayer
           homes={homes}
           groups={neighborhoodGroups}
@@ -395,6 +399,7 @@ function AnimatedIsochroneLayer({
       <MapGeoJSON
         id="travel-time-isochrone"
         data={animatedData}
+        beforeId={MAP_LAYER_ANCHOR_IDS.coverage}
         fillPaint={{
           "fill-color": layerColor,
           "fill-color-transition": { duration: 200 },
@@ -410,6 +415,7 @@ function AnimatedIsochroneLayer({
         <MapGeoJSON
           id="travel-time-isochrone-pending"
           data={animatedData}
+          beforeId={MAP_LAYER_ANCHOR_IDS.coverage}
           fillPaint={{
             "fill-pattern": pattern,
             "fill-opacity": PENDING_ISOCHRONE_MIN_OPACITY,
