@@ -168,16 +168,60 @@ function clampRating(rating: number) {
   return Math.max(1, Math.min(5, Number(rating.toFixed(1))))
 }
 
+const FALLBACK_HIGHLIGHTS = [
+  "the convenient location",
+  "the responsive on-site management",
+  "the well-kept common areas",
+  "the quiet residential block",
+]
+const FALLBACK_SECOND_HIGHLIGHTS = [
+  "the easy access to transit",
+  "the helpful maintenance team",
+  "the natural light in the units",
+  "the secure entry system",
+]
+const FALLBACK_CAUTIONS = [
+  "street parking can be tight on weekends",
+  "some units face a busy street",
+  "the laundry room gets busy in the evenings",
+  "older windows can feel drafty in winter",
+]
+const FALLBACK_TAGS: [string, string, string][] = [
+  ["Transit", "Clean", "Responsive staff"],
+  ["Quiet", "Value", "Spacious"],
+  ["Walkable", "Secure entry", "Maintenance"],
+]
+
+/** Stable non-negative hash of an id, for deterministic mock selection. */
+function stableIndex(id: string): number {
+  let h = 0
+  for (const character of id) h = (h * 31 + character.charCodeAt(0)) >>> 0
+  return h
+}
+
+/** Deterministic review profile for a building without a curated one. */
+function fallbackReviewProfile(id: string): ReviewProfile {
+  const h = stableIndex(id)
+  // Use unsigned shifts (>>>) — a signed >> goes negative for hashes above
+  // 2^31, producing a negative array index and an undefined field.
+  return {
+    highlight: FALLBACK_HIGHLIGHTS[h % FALLBACK_HIGHLIGHTS.length],
+    secondHighlight:
+      FALLBACK_SECOND_HIGHLIGHTS[(h >>> 2) % FALLBACK_SECOND_HIGHLIGHTS.length],
+    caution: FALLBACK_CAUTIONS[(h >>> 4) % FALLBACK_CAUTIONS.length],
+    tags: FALLBACK_TAGS[h % FALLBACK_TAGS.length],
+    rating: 3.7 + (h % 9) / 10,
+  }
+}
+
 export function getBuildingReviewData(
   home: Pick<Home, "id" | "name" | "neighborhood">
 ): BuildingReviewData {
-  const profile = profiles[home.id]
-
-  if (!profile) {
-    throw new Error(`Missing mock review profile for ${home.id}`)
-  }
-
-  const profileIndex = Object.keys(profiles).indexOf(home.id)
+  // Real Chicago developments have no curated profile — fall back to a
+  // deterministic generated one so any building id renders valid review data.
+  const knownIndex = Object.keys(profiles).indexOf(home.id)
+  const profile = profiles[home.id] ?? fallbackReviewProfile(home.id)
+  const profileIndex = knownIndex >= 0 ? knownIndex : stableIndex(home.id)
   const ratingOffsets = [0.1, -0.2, 0] as const
   const sourceSummaries = sources.map((source, index) => ({
     source,

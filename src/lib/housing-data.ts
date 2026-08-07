@@ -1,3 +1,8 @@
+import { estimateDurationMinutes, haversineMiles } from "@/lib/agent/geo"
+import type { LatLng } from "@/lib/agent/geo"
+import { mockHousingDetail } from "@/domain"
+import type { HousingDevelopment } from "@/domain"
+
 export type TravelMode = "train" | "walk" | "drive" | "rideshare"
 export type Optimizer = "cheapest" | "quickest"
 
@@ -206,8 +211,14 @@ export function commuteFor(home: Home, mode: TravelMode) {
   return Math.round(home.trainMinutes * modes[mode].factor)
 }
 
-function reachable(mode: TravelMode, maxMinutes: number): HomeResult[] {
-  return homes
+// `homeList` defaults to the built-in fixtures so existing callers/tests keep
+// their 2-arg signature; the live explorer passes real developments instead.
+function reachable(
+  mode: TravelMode,
+  maxMinutes: number,
+  homeList: Home[] = homes
+): HomeResult[] {
+  return homeList
     .map((home) => ({
       ...home,
       mode,
@@ -219,9 +230,10 @@ function reachable(mode: TravelMode, maxMinutes: number): HomeResult[] {
 
 export function getManualResults(
   mode: TravelMode,
-  maxMinutes: number
+  maxMinutes: number,
+  homeList: Home[] = homes
 ): ExplorerResult {
-  const results = reachable(mode, maxMinutes).sort(
+  const results = reachable(mode, maxMinutes, homeList).sort(
     (a, b) => a.commute - b.commute || a.rent - b.rent
   )
   return { results, mode, winnerId: null }
@@ -229,14 +241,50 @@ export function getManualResults(
 
 export function getOptimizedResults(
   optimizer: Optimizer,
-  maxMinutes: number
+  maxMinutes: number,
+  homeList: Home[] = homes
 ): ExplorerResult {
   const mode: TravelMode = optimizer === "cheapest" ? "train" : "rideshare"
-  const candidates = reachable(mode, maxMinutes)
-  const winner = [...candidates].sort((a, b) =>
-    optimizer === "cheapest"
-      ? a.rent - b.rent || a.commute - b.commute
-      : a.commute - b.commute || a.rent - b.rent
-  )[0]
-  return { results: [winner], mode, winnerId: winner.id }
+  const candidates = reachable(mode, maxMinutes, homeList)
+  const winner = [...candidates]
+    .sort((a, b) =>
+      optimizer === "cheapest"
+        ? a.rent - b.rent || a.commute - b.commute
+        : a.commute - b.commute || a.rent - b.rent
+    )
+    .at(0)
+  return {
+    results: winner ? [winner] : [],
+    mode,
+    winnerId: winner?.id ?? null,
+  }
+}
+
+// The Loop destination, matching WORK_LOCATION in the explorer, used to
+// estimate a transit baseline (`trainMinutes`) for each development.
+const LOOP: LatLng = { lat: 41.882, lng: -87.633 }
+
+/**
+ * Map real Chicago affordable-housing developments into the `Home` shape the
+ * explorer already renders. The feed has location/name/address; rent, beds, and
+ * the transit baseline are estimated (mock rent/beds from `mockHousingDetail`,
+ * `trainMinutes` from straight-line distance to the Loop).
+ */
+export function buildHomesFromDevelopments(
+  developments: HousingDevelopment[]
+): Home[] {
+  return developments.map((development) => {
+    const detail = mockHousingDetail(development.id)
+    const miles = haversineMiles(development.location, LOOP)
+    return {
+      id: development.id,
+      name: development.propertyName,
+      neighborhood: development.communityArea ?? "Chicago",
+      address: development.address,
+      rent: detail.rentUsd ?? 1000,
+      beds: detail.beds ?? 1,
+      coordinates: [development.location.lng, development.location.lat],
+      trainMinutes: Math.max(5, estimateDurationMinutes(miles, "transit")),
+    }
+  })
 }
