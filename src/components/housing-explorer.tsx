@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useChat } from "@ai-sdk/react"
+import { createChat } from "@shadcn/helpers/ai-sdk"
 import { useNavigate } from "@tanstack/react-router"
 import {
   Bot,
@@ -30,6 +31,7 @@ import type {
   GroceryStoreSelection,
 } from "@/components/app-map"
 import { Badge } from "@/components/ui/badge"
+import { Bubble, BubbleContent } from "@/components/ui/bubble"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -47,6 +49,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Label } from "@/components/ui/label"
+import { Message, MessageAvatar, MessageContent } from "@/components/ui/message"
 import {
   ResizableHandle,
   ResizablePanel,
@@ -83,6 +86,13 @@ const DEFAULT_WORK_LOCATION = {
   label: destination,
   coordinates: [-87.633, 41.882] as [number, number],
 }
+
+const INITIAL_CHAT_MESSAGES = createChat()
+  .assistant(
+    "Tell me about your commute, budget, and household — or check whether you qualify for affordable housing.",
+    { id: "assistant-welcome" }
+  )
+  .get()
 
 // The agent's TransportMode is a superset of this demo's TravelMode (no
 // "bike" here, so it falls back to "walk" as the closest non-motorized mode).
@@ -122,8 +132,9 @@ export function HousingExplorer() {
     messages: chatMessages,
     sendMessage: sendChatMessage,
     status: chatStatus,
-  } = useChat()
+  } = useChat({ messages: INITIAL_CHAT_MESSAGES })
   const [chatInput, setChatInput] = useState("")
+  const isChatBusy = chatStatus === "submitted" || chatStatus === "streaming"
 
   // Agent-produced app/map state lives in the URL (query params), not just
   // in this component's memory, so a reload/back-forward preserves it and
@@ -267,8 +278,8 @@ export function HousingExplorer() {
   }
 
   const submitChatMessage = () => {
-    if (!chatInput.trim() || chatStatus === "streaming") return
-    sendChatMessage({ text: chatInput })
+    if (!chatInput.trim() || isChatBusy) return
+    void sendChatMessage({ text: chatInput })
     setChatInput("")
   }
 
@@ -546,65 +557,41 @@ export function HousingExplorer() {
                     ref={chatScrollRef}
                     className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4"
                   >
-                    {chatMessages.length === 0 && (
-                      <div className="flex items-start gap-2">
-                        <span
-                          className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
-                          aria-hidden="true"
-                        >
-                          <Bot className="size-3" />
-                        </span>
-                        <div className="flex flex-col items-start gap-2">
-                          <p className="rounded-lg bg-muted p-3 text-sm leading-6 text-foreground">
-                            Tell me about your commute, budget, and household —
-                            or check whether you qualify for affordable housing.
-                          </p>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={chatStatus === "streaming"}
-                            onClick={() =>
-                              sendChatMessage({ text: "See if I qualify" })
-                            }
-                          >
-                            <SearchCheck data-icon="inline-start" /> See if I
-                            qualify
-                          </Button>
-                        </div>
-                      </div>
-                    )}
                     {chatMessages.map((message) => (
-                      <div
+                      <Message
                         key={message.id}
-                        className={cn(
-                          "flex items-start gap-2",
-                          message.role === "user" && "flex-row-reverse"
-                        )}
+                        align={message.role === "user" ? "end" : "start"}
                       >
                         {message.role === "assistant" && (
-                          <span
-                            className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
-                            aria-hidden="true"
-                          >
-                            <Bot className="size-3" />
-                          </span>
+                          <MessageAvatar className="size-8" aria-hidden="true">
+                            <Bot />
+                          </MessageAvatar>
                         )}
-                        <div className="flex min-w-0 flex-1 flex-col gap-3">
+                        <MessageContent>
                           {message.parts.map((part, index) => {
                             if (part.type === "text") {
+                              const isAnimating =
+                                message.role === "assistant" &&
+                                chatStatus === "streaming" &&
+                                message.id === chatMessages.at(-1)?.id
                               return (
-                                <div
+                                <Bubble
                                   key={`${message.id}-${index}`}
-                                  className={cn(
-                                    "rounded-lg p-3 text-sm",
+                                  align={
+                                    message.role === "user" ? "end" : "start"
+                                  }
+                                  variant={
                                     message.role === "user"
-                                      ? "ml-auto max-w-[85%] bg-primary text-primary-foreground"
-                                      : "max-w-[85%] bg-muted text-foreground"
-                                  )}
+                                      ? "default"
+                                      : "muted"
+                                  }
                                 >
-                                  <AgentMarkdown>{part.text}</AgentMarkdown>
-                                </div>
+                                  <BubbleContent>
+                                    <AgentMarkdown isAnimating={isAnimating}>
+                                      {part.text}
+                                    </AgentMarkdown>
+                                  </BubbleContent>
+                                </Bubble>
                               )
                             }
                             if (
@@ -653,9 +640,24 @@ export function HousingExplorer() {
                             }
                             return null
                           })}
-                        </div>
-                      </div>
+                        </MessageContent>
+                      </Message>
                     ))}
+                    {chatMessages.length === INITIAL_CHAT_MESSAGES.length && (
+                      <Button
+                        className="ml-10 self-start"
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isChatBusy}
+                        onClick={() =>
+                          void sendChatMessage({ text: "See if I qualify" })
+                        }
+                      >
+                        <SearchCheck data-icon="inline-start" /> See if I
+                        qualify
+                      </Button>
+                    )}
                   </div>
 
                   <form
@@ -681,12 +683,12 @@ export function HousingExplorer() {
                       }}
                       placeholder="Message the housing agent"
                       rows={2}
-                      disabled={chatStatus === "streaming"}
+                      disabled={isChatBusy}
                     />
                     <Button
                       className="h-16"
                       type="submit"
-                      disabled={chatStatus === "streaming" || !chatInput.trim()}
+                      disabled={isChatBusy || !chatInput.trim()}
                     >
                       <Send data-icon="inline-start" /> Send
                     </Button>
