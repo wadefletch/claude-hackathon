@@ -65,6 +65,7 @@ type GroceryStoreProperties = Omit<GroceryStoreSelection, "coordinates">
 type IsochroneData = FeatureCollection<Geometry>
 
 const ISOCHRONE_TRANSITION_DURATION = 350
+const STALE_ISOCHRONE_COLOR = "#737373"
 
 export function AppMap({
   state,
@@ -83,15 +84,16 @@ export function AppMap({
     isochrone,
   } = state
   const isochroneOrigin = isochrone?.origin ?? work
-  const { data: isochroneData } = useGeoapifyIsochrone(
-    isochrone
-      ? {
-          coordinates: isochroneOrigin.coordinates,
-          mode: isochrone.mode,
-          minutes: isochrone.minutes,
-        }
-      : undefined
-  )
+  const { data: isochroneData, isPlaceholderData: isIsochroneStale } =
+    useGeoapifyIsochrone(
+      isochrone
+        ? {
+            coordinates: isochroneOrigin.coordinates,
+            mode: isochrone.mode,
+            minutes: isochrone.minutes,
+          }
+        : undefined
+    )
 
   const isochroneColor = isochrone?.mode === "transit" ? "#2563eb" : "#ea580c"
 
@@ -107,7 +109,11 @@ export function AppMap({
         <MapControls showCompass showFullscreen />
         {showTransit && <TransitLayers />}
         {isochrone && isochroneData && (
-          <AnimatedIsochroneLayer data={isochroneData} color={isochroneColor} />
+          <AnimatedIsochroneLayer
+            data={isochroneData}
+            color={isochroneColor}
+            isStale={isIsochroneStale}
+          />
         )}
         {homes.map((home) => (
           <HomeMarker
@@ -142,9 +148,11 @@ export function AppMap({
 function AnimatedIsochroneLayer({
   data,
   color,
+  isStale,
 }: {
   data: IsochroneData
   color: string
+  isStale: boolean
 }) {
   const [animatedData, setAnimatedData] = useState(data)
   const animatedDataRef = useRef(data)
@@ -179,16 +187,20 @@ function AnimatedIsochroneLayer({
     return () => window.cancelAnimationFrame(animationFrame)
   }, [data])
 
+  const layerColor = isStale ? STALE_ISOCHRONE_COLOR : color
+
   return (
     <MapGeoJSON
       id="travel-time-isochrone"
       data={animatedData}
       fillPaint={{
-        "fill-color": color,
+        "fill-color": layerColor,
+        "fill-color-transition": { duration: 200 },
         "fill-opacity": 0.2,
       }}
       linePaint={{
-        "line-color": color,
+        "line-color": layerColor,
+        "line-color-transition": { duration: 200 },
         "line-width": 2,
       }}
     />
