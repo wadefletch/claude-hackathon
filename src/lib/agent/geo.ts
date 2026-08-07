@@ -26,20 +26,37 @@ export function haversineMeters(a: LatLng, b: LatLng): number {
 
 // Straight-line-distance-based estimate used until a real routing provider
 // (Route.provider) is wired in — every Route produced this way sets
-// estimate: true so consumers know it's not from a real routing API.
-const AVERAGE_SPEED_MPH = {
-  walk: 3,
-  bike: 10,
-  transit: 15,
-  car: 25,
-  rideshare: 22, // similar to car, slightly lower to account for pickup wait
+// estimate: true so consumers know it's not from a real routing API. When a
+// provider (e.g. a real transit/directions API) is wired in, it should
+// replace this whole model and set estimate: false with actual path/route
+// data instead of straight-line distance.
+//
+// Straight-line distance understates real travel distance because streets
+// and rail lines aren't straight, so we inflate it by a detour factor before
+// converting to time. Chicago's street grid runs close to true north/south
+// and east/west, adding roughly 25% to straight-line distance for a typical
+// trip.
+const NETWORK_DETOUR_FACTOR = 1.25
+
+// Per-mode in-vehicle speed plus a fixed number of minutes that doesn't scale
+// with distance: walking to a stop/car, waiting, parking, etc. Transit's
+// fixed overhead (walk to the stop + wait for the next vehicle) is the
+// biggest of these and is what the old model was missing entirely.
+const MODE_PARAMS = {
+  walk: { mph: 3, fixedMinutes: 0 },
+  bike: { mph: 10, fixedMinutes: 2 }, // unlock/park
+  transit: { mph: 17, fixedMinutes: 12 }, // walk to stop + wait
+  car: { mph: 22, fixedMinutes: 5 }, // parking + last walk
+  rideshare: { mph: 22, fixedMinutes: 5 }, // pickup wait
 } as const
 
-export type EstimateTravelMode = keyof typeof AVERAGE_SPEED_MPH
+export type EstimateTravelMode = keyof typeof MODE_PARAMS
 
 export function estimateDurationMinutes(
   distanceMiles: number,
   mode: EstimateTravelMode
 ): number {
-  return Math.round((distanceMiles / AVERAGE_SPEED_MPH[mode]) * 60)
+  const { mph, fixedMinutes } = MODE_PARAMS[mode]
+  const networkMiles = distanceMiles * NETWORK_DETOUR_FACTOR
+  return Math.round((networkMiles / mph) * 60 + fixedMinutes)
 }

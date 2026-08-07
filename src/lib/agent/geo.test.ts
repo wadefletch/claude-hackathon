@@ -27,4 +27,28 @@ describe("geo utilities", () => {
     const carMinutes = estimateDurationMinutes(5, "car")
     expect(walkMinutes).toBeGreaterThan(carMinutes)
   })
+
+  it("gives transit a floor from its fixed access overhead even for very short trips", () => {
+    const minutes = estimateDurationMinutes(0.2, "transit")
+    expect(minutes).toBeGreaterThan(10)
+  })
+
+  it("orders modes walk slower than transit slower than car at the same distance", () => {
+    const walkMinutes = estimateDurationMinutes(5, "walk")
+    const transitMinutes = estimateDurationMinutes(5, "transit")
+    const carMinutes = estimateDurationMinutes(5, "car")
+    expect(walkMinutes).toBeGreaterThan(transitMinutes)
+    expect(transitMinutes).toBeGreaterThan(carMinutes)
+  })
+
+  it("pins transit estimates to known-good sanity values", () => {
+    expect(estimateDurationMinutes(1.5, "transit")).toBe(19)
+    expect(estimateDurationMinutes(3.5, "transit")).toBe(27)
+    expect(estimateDurationMinutes(5, "transit")).toBe(34)
+  })
+
+  it("pins car and walk estimates to known-good sanity values", () => {
+    expect(estimateDurationMinutes(5, "car")).toBe(22)
+    expect(estimateDurationMinutes(1.5, "walk")).toBe(38)
+  })
 })
