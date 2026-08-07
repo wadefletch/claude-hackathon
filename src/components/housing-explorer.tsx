@@ -255,23 +255,10 @@ export function HousingExplorer() {
         <Badge variant="outline">Chicago, IL</Badge>
       </header>
 
-      <section
-        className="mx-auto w-full max-w-[1800px] shrink-0 px-4 py-4 sm:px-8 xl:px-10"
+      <div
+        className="mx-auto flex w-full max-w-[1800px] flex-col gap-4 px-3 pt-4 pb-12 sm:px-4 lg:min-h-0 lg:flex-1 lg:flex-row lg:pb-4 xl:px-10"
         id="top"
       >
-        <p className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
-          Affordable housing · commute explorer
-        </p>
-        <h1 className="mt-1 text-2xl font-medium tracking-tight sm:text-3xl">
-          Find a home that gets you there.
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Compare affordable homes across Chicago by commute time and monthly
-          travel cost.
-        </p>
-      </section>
-
-      <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-4 px-3 pb-12 sm:px-4 lg:min-h-0 lg:flex-1 lg:flex-row lg:pb-4 xl:px-10">
         <aside
           className="flex h-[520px] w-full shrink-0 flex-col overflow-hidden rounded-xl border bg-card lg:h-auto lg:w-[380px]"
           aria-label="Housing and commute filters"
