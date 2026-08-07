@@ -1,0 +1,19 @@
+<svg viewBox="0 0 520 160" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#D9481E"/>
+      <stop offset="100%" stop-color="#FF8A5C"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Faceted / low-poly house-pin icon -->
+  <g transform="translate(20, 20)">
+    <polygon points="50,0 100,45 100,120 0,120 0,45" fill="url(#g2)"/>
+    <polygon points="50,0 100,45 50,60" fill="#D9481E" opacity="0.55"/>
+    <polygon points="50,0 0,45 50,60" fill="#FF8A5C" opacity="0.75"/>
+    <rect x="35" y="80" width="30" height="40" fill="#FFFFFF"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="150" y="100" font-family="Helvetica, Arial, sans-serif" font-size="52" font-weight="800" letter-spacing="-1" fill="#1E1B18">Quali<tspan fill="url(#g2)">Find</tspan></text>
+</svg>

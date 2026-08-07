@@ -1,7 +1,16 @@
-import { useEffect, useId } from "react"
-import type { MapLayerMouseEvent } from "maplibre-gl"
+import { useEffect, useRef, useState } from "react"
+import type { FeatureCollection, Geometry } from "geojson"
 import { Building2, Sparkles } from "lucide-react"
 
+import {
+  DEFAULT_VISIBLE_MAP_DATA_LAYER_IDS,
+  MapDataLayerControls,
+  MapDataLayers,
+} from "@/components/map-data-layers"
+import type {
+  MapDataLayerFeature,
+  MapDataLayerId,
+} from "@/components/map-data-layers"
 import {
   Map,
   MapControls,
@@ -12,13 +21,10 @@ import {
   MarkerLabel,
   useMap,
 } from "@/components/ui/map"
-import { TransitLayers } from "@/components/transit-layers"
+import { HandGestureMapControls } from "@/components/hand-gesture-map-controls"
 import { useGeoapifyIsochrone } from "@/hooks/use-geoapify-isochrone"
 import type { IsochroneMode } from "@/hooks/use-geoapify-isochrone"
-import {
-  dataSourceMarkerImageId,
-  registerDataSourceMarkerIcons,
-} from "@/lib/map-data-source-icons"
+import { interpolateIsochrone } from "@/lib/isochrone-animation"
 import { cn } from "@/lib/utils"
 
 export type AppMapLocation = {
@@ -29,13 +35,6 @@ export type AppMapLocation = {
 export type AppMapHome = AppMapLocation & {
   id: string
   rent?: number
-}
-
-export type GroceryStoreSelection = {
-  coordinates: [number, number]
-  store_name?: string
-  address?: string
-  new_status?: string
 }
 
 export type IsochroneOptions = {
@@ -49,39 +48,29 @@ export type AppMapState = {
   homes: AppMapHome[]
   selectedHomeId: string | null
   winnerId: string | null
-  showTransit: boolean
-  showGroceryStores: boolean
-  selectedGroceryStore: GroceryStoreSelection | null
   isochrone?: IsochroneOptions
 }
 
 export type AppMapProps = {
   state: AppMapState
   onHomeSelect: (home: AppMapHome, trigger: HTMLElement) => void
-  onGroceryStoreSelect: (store: GroceryStoreSelection | null) => void
   className?: string
 }
 
-type GroceryStoreProperties = Omit<GroceryStoreSelection, "coordinates">
+type IsochroneData = FeatureCollection<Geometry>
 
-export function AppMap({
-  state,
-  onHomeSelect,
-  onGroceryStoreSelect,
-  className,
-}: AppMapProps) {
-  const {
-    homes,
-    work,
-    selectedHomeId,
-    winnerId,
-    showTransit,
-    showGroceryStores,
-    selectedGroceryStore,
-    isochrone,
-  } = state
+const ISOCHRONE_TRANSITION_DURATION = 350
+const STALE_ISOCHRONE_COLOR = "#737373"
+
+export function AppMap({ state, onHomeSelect, className }: AppMapProps) {
+  const { homes, work, selectedHomeId, winnerId, isochrone } = state
+  const [visibleLayerIds, setVisibleLayerIds] = useState<MapDataLayerId[]>(
+    DEFAULT_VISIBLE_MAP_DATA_LAYER_IDS
+  )
+  const [selectedDataLayerFeature, setSelectedDataLayerFeature] =
+    useState<MapDataLayerFeature | null>(null)
   const isochroneOrigin = isochrone?.origin ?? work
-  const { data: isochroneData, isFetching: isIsochroneLoading } =
+  const { data: isochroneData, isPlaceholderData: isIsochroneStale } =
     useGeoapifyIsochrone(
       isochrone
         ? {
@@ -94,6 +83,16 @@ export function AppMap({
 
   const isochroneColor = isochrone?.mode === "transit" ? "#2563eb" : "#ea580c"
 
+  const setLayerVisibilities = (layerIds: MapDataLayerId[]) => {
+    setVisibleLayerIds(layerIds)
+    if (
+      selectedDataLayerFeature &&
+      !layerIds.some((layerId) => layerId === selectedDataLayerFeature.layerId)
+    ) {
+      setSelectedDataLayerFeature(null)
+    }
+  }
+
   return (
     <section
       className={cn(
@@ -102,21 +101,22 @@ export function AppMap({
       )}
       aria-label={`Map of homes near ${work.label}`}
     >
-      <Map loading={isIsochroneLoading}>
+      <Map>
         <MapControls showCompass showFullscreen />
-        {showTransit && <TransitLayers />}
-        {isochroneData && (
-          <MapGeoJSON
-            id="travel-time-isochrone"
+        <HandGestureMapControls />
+        <MapDataLayerControls
+          visibleLayerIds={visibleLayerIds}
+          onVisibleLayerIdsChange={setLayerVisibilities}
+        />
+        <MapDataLayers
+          visibleLayerIds={visibleLayerIds}
+          onFeatureSelect={setSelectedDataLayerFeature}
+        />
+        {isochrone && isochroneData && (
+          <AnimatedIsochroneLayer
             data={isochroneData}
-            fillPaint={{
-              "fill-color": isochroneColor,
-              "fill-opacity": 0.2,
-            }}
-            linePaint={{
-              "line-color": isochroneColor,
-              "line-width": 2,
-            }}
+            color={isochroneColor}
+            isStale={isIsochroneStale}
           />
         )}
         {homes.map((home) => (
@@ -129,13 +129,10 @@ export function AppMap({
           />
         ))}
         <WorkMarker location={work} />
-        {showGroceryStores && (
-          <GroceryStoresLayer onSelect={onGroceryStoreSelect} />
-        )}
-        {showGroceryStores && selectedGroceryStore && (
-          <GroceryStorePopup
-            store={selectedGroceryStore}
-            onClose={() => onGroceryStoreSelect(null)}
+        {selectedDataLayerFeature && (
+          <DataLayerFeaturePopup
+            feature={selectedDataLayerFeature}
+            onClose={() => setSelectedDataLayerFeature(null)}
           />
         )}
         <LocationsViewport
@@ -146,6 +143,68 @@ export function AppMap({
         />
       </Map>
     </section>
+  )
+}
+
+function AnimatedIsochroneLayer({
+  data,
+  color,
+  isStale,
+}: {
+  data: IsochroneData
+  color: string
+  isStale: boolean
+}) {
+  const [animatedData, setAnimatedData] = useState(data)
+  const animatedDataRef = useRef(data)
+
+  useEffect(() => {
+    if (data === animatedDataRef.current) return
+
+    const from = animatedDataRef.current
+    const startedAt = performance.now()
+    let animationFrame = 0
+
+    const animate = (now: number) => {
+      const progress = Math.min(
+        (now - startedAt) / ISOCHRONE_TRANSITION_DURATION,
+        1
+      )
+      const easedProgress = 1 - Math.pow(1 - progress, 3)
+      const nextData = interpolateIsochrone(from, data, easedProgress)
+
+      animatedDataRef.current = nextData
+      setAnimatedData(nextData)
+
+      if (progress < 1) {
+        animationFrame = window.requestAnimationFrame(animate)
+      } else {
+        animatedDataRef.current = data
+        setAnimatedData(data)
+      }
+    }
+
+    animationFrame = window.requestAnimationFrame(animate)
+    return () => window.cancelAnimationFrame(animationFrame)
+  }, [data])
+
+  const layerColor = isStale ? STALE_ISOCHRONE_COLOR : color
+
+  return (
+    <MapGeoJSON
+      id="travel-time-isochrone"
+      data={animatedData}
+      fillPaint={{
+        "fill-color": layerColor,
+        "fill-color-transition": { duration: 200 },
+        "fill-opacity": 0.2,
+      }}
+      linePaint={{
+        "line-color": layerColor,
+        "line-color-transition": { duration: 200 },
+        "line-width": 2,
+      }}
+    />
   )
 }
 
@@ -189,124 +248,29 @@ function HomeMarker({
   )
 }
 
-function GroceryStoresLayer({
-  onSelect,
-}: {
-  onSelect: (store: GroceryStoreSelection) => void
-}) {
-  const { map, isLoaded } = useMap()
-  const id = useId()
-  const sourceId = `grocery-stores-source-${id}`
-  const layerId = `grocery-stores-layer-${id}`
-
-  useEffect(() => {
-    if (!map || !isLoaded) return
-    let cancelled = false
-
-    const handleClick = (event: MapLayerMouseEvent) => {
-      const feature = event.features?.[0]
-      if (!feature || feature.geometry.type !== "Point") return
-
-      const coordinates = feature.geometry.coordinates.slice() as [
-        number,
-        number,
-      ]
-      const properties = feature.properties as GroceryStoreProperties | null
-
-      onSelect({
-        coordinates,
-        store_name: properties?.store_name,
-        address: properties?.address,
-        new_status: properties?.new_status,
-      })
-    }
-
-    const handleMouseEnter = () => {
-      map.getCanvas().style.cursor = "pointer"
-    }
-    const handleMouseLeave = () => {
-      map.getCanvas().style.cursor = ""
-    }
-
-    void registerDataSourceMarkerIcons(map, [
-      "groceryStore",
-      "groceryStoreLimited",
-      "groceryStoreClosed",
-    ]).then(() => {
-      if (cancelled) return
-
-      map.addSource(sourceId, {
-        type: "geojson",
-        data: "/data/grocery-store-status-historical.geojson",
-      })
-
-      map.addLayer({
-        id: layerId,
-        type: "symbol",
-        source: sourceId,
-        layout: {
-          "icon-image": [
-            "match",
-            ["get", "new_status"],
-            "CLOSED",
-            dataSourceMarkerImageId("groceryStoreClosed"),
-            "ONLINE ORDERS ONLY",
-            dataSourceMarkerImageId("groceryStoreLimited"),
-            dataSourceMarkerImageId("groceryStore"),
-          ],
-          "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 0.68, 14, 0.94],
-          "icon-allow-overlap": false,
-          "icon-padding": 2,
-        },
-      })
-
-      map.on("click", layerId, handleClick)
-      map.on("mouseenter", layerId, handleMouseEnter)
-      map.on("mouseleave", layerId, handleMouseLeave)
-    })
-
-    return () => {
-      cancelled = true
-      if (map.getLayer(layerId)) {
-        map.off("click", layerId, handleClick)
-        map.off("mouseenter", layerId, handleMouseEnter)
-        map.off("mouseleave", layerId, handleMouseLeave)
-      }
-      if (map.getLayer(layerId)) map.removeLayer(layerId)
-      if (map.getSource(sourceId)) map.removeSource(sourceId)
-      map.getCanvas().style.cursor = ""
-    }
-  }, [isLoaded, layerId, map, onSelect, sourceId])
-
-  return null
-}
-
-function GroceryStorePopup({
-  store,
+function DataLayerFeaturePopup({
+  feature,
   onClose,
 }: {
-  store: GroceryStoreSelection
+  feature: MapDataLayerFeature
   onClose: () => void
 }) {
   return (
     <MapPopup
-      longitude={store.coordinates[0]}
-      latitude={store.coordinates[1]}
+      longitude={feature.coordinates[0]}
+      latitude={feature.coordinates[1]}
       onClose={onClose}
       closeOnClick={false}
       closeButton
       offset={10}
     >
       <div className="flex min-w-40 flex-col gap-1">
-        <p className="font-medium">{store.store_name ?? "Grocery store"}</p>
-        {store.address && (
-          <p className="text-sm text-muted-foreground">{store.address}</p>
-        )}
-        {store.new_status && (
-          <p className="text-xs font-medium text-muted-foreground">
-            {store.new_status}
+        <p className="font-medium">{feature.title}</p>
+        {feature.details.map((detail) => (
+          <p key={detail} className="text-sm text-muted-foreground">
+            {detail}
           </p>
-        )}
+        ))}
       </div>
     </MapPopup>
   )
