@@ -51,6 +51,14 @@ import {
 import { Label } from "@/components/ui/label"
 import { Message, MessageContent, MessageFooter } from "@/components/ui/message"
 import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from "@/components/ui/message-scroller"
+import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
@@ -119,7 +127,6 @@ export function HousingExplorer() {
   >("overview")
   const detailDialogRef = useRef<HTMLDialogElement>(null)
   const detailTriggerRef = useRef<HTMLElement | null>(null)
-  const chatScrollRef = useRef<HTMLDivElement>(null)
   const {
     messages: chatMessages,
     sendMessage: sendChatMessage,
@@ -232,15 +239,6 @@ export function HousingExplorer() {
     const dialog = detailDialogRef.current
     if (isDetailOpen && dialog && !dialog.open) dialog.showModal()
   }, [isDetailOpen, selectedId])
-
-  // Keep the chat thread pinned to the latest content — new messages and
-  // streamed tokens both update `chatMessages`, so this fires continuously
-  // while the agent is replying, not just when a full message completes.
-  useEffect(() => {
-    const container = chatScrollRef.current
-    if (!container) return
-    container.scrollTop = container.scrollHeight
-  }, [chatMessages])
 
   const openBuildingDetail = (id: string, trigger: HTMLElement) => {
     detailTriggerRef.current = trigger
@@ -545,116 +543,141 @@ export function HousingExplorer() {
                     Ask about commute, budget, or eligibility
                   </p>
 
-                  <div
-                    ref={chatScrollRef}
-                    className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4"
-                  >
-                    {chatMessages.length === 0 && (
-                      <Message>
-                        <MessageContent>
-                          <Bubble variant="muted">
-                            <BubbleContent>
-                              Tell me about your commute, budget, and household
-                              — or check whether you qualify for affordable
-                              housing.
-                            </BubbleContent>
-                          </Bubble>
-                          <MessageFooter>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={isChatBusy}
-                              onClick={() =>
-                                void sendChatMessage({
-                                  text: "See if I qualify",
-                                })
-                              }
+                  <MessageScrollerProvider autoScroll>
+                    <MessageScroller className="flex-1">
+                      <MessageScrollerViewport>
+                        <MessageScrollerContent
+                          className="gap-4 px-4 pb-4"
+                          aria-busy={chatStatus === "streaming"}
+                        >
+                          {chatMessages.length === 0 && (
+                            <MessageScrollerItem messageId="agent-welcome">
+                              <Message>
+                                <MessageContent>
+                                  <Bubble variant="ghost">
+                                    <BubbleContent>
+                                      Tell me about your commute, budget, and
+                                      household — or check whether you qualify
+                                      for affordable housing.
+                                    </BubbleContent>
+                                  </Bubble>
+                                  <MessageFooter>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={isChatBusy}
+                                      onClick={() =>
+                                        void sendChatMessage({
+                                          text: "See if I qualify",
+                                        })
+                                      }
+                                    >
+                                      <SearchCheck data-icon="inline-start" />
+                                      See if I qualify
+                                    </Button>
+                                  </MessageFooter>
+                                </MessageContent>
+                              </Message>
+                            </MessageScrollerItem>
+                          )}
+                          {chatMessages.map((message) => (
+                            <MessageScrollerItem
+                              key={message.id}
+                              messageId={message.id}
+                              scrollAnchor={message.role === "user"}
                             >
-                              <SearchCheck data-icon="inline-start" /> See if I
-                              qualify
-                            </Button>
-                          </MessageFooter>
-                        </MessageContent>
-                      </Message>
-                    )}
-                    {chatMessages.map((message) => (
-                      <Message
-                        key={message.id}
-                        align={message.role === "user" ? "end" : "start"}
-                      >
-                        <MessageContent>
-                          {message.parts.map((part, index) => {
-                            if (part.type === "text") {
-                              return (
-                                <Bubble
-                                  key={`${message.id}-${index}`}
-                                  variant={
-                                    message.role === "user"
-                                      ? "default"
-                                      : "muted"
-                                  }
-                                >
-                                  <BubbleContent>
-                                    {message.role === "assistant" ? (
-                                      <Streamdown>{part.text}</Streamdown>
-                                    ) : (
-                                      part.text
-                                    )}
-                                  </BubbleContent>
-                                </Bubble>
-                              )
-                            }
-                            if (
-                              part.type === "tool-show_map" &&
-                              part.state === "output-available"
-                            ) {
-                              const payload = part.output as ShowMapInput
-                              return (
-                                <div
-                                  key={`${message.id}-${index}`}
-                                  className="flex flex-col gap-3"
-                                >
-                                  {payload.matches.map((match) => {
-                                    const workRoute = match.routes.find(
-                                      (route) => route.purpose === "work"
-                                    )
-                                    return (
-                                      <Card key={match.housing.id}>
-                                        <CardHeader>
-                                          <CardDescription>
-                                            {match.housing.communityArea ??
-                                              match.housing.propertyName}
-                                          </CardDescription>
-                                          <CardTitle className="text-sm">
-                                            {match.housing.address}
-                                          </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="text-sm text-muted-foreground">
-                                          {workRoute && (
-                                            <p>
-                                              {workRoute.durationMinutes} min by{" "}
-                                              {workRoute.mode} to work
-                                            </p>
-                                          )}
-                                          <div className="mt-2">
-                                            <Streamdown>
-                                              {match.rationale}
-                                            </Streamdown>
-                                          </div>
-                                        </CardContent>
-                                      </Card>
-                                    )
+                              <Message
+                                align={
+                                  message.role === "user" ? "end" : "start"
+                                }
+                              >
+                                <MessageContent>
+                                  {message.parts.map((part, index) => {
+                                    if (part.type === "text") {
+                                      return (
+                                        <Bubble
+                                          key={`${message.id}-${index}`}
+                                          variant={
+                                            message.role === "user"
+                                              ? "secondary"
+                                              : "ghost"
+                                          }
+                                        >
+                                          <BubbleContent>
+                                            {message.role === "assistant" ? (
+                                              <Streamdown>
+                                                {part.text}
+                                              </Streamdown>
+                                            ) : (
+                                              part.text
+                                            )}
+                                          </BubbleContent>
+                                        </Bubble>
+                                      )
+                                    }
+                                    if (
+                                      part.type === "tool-show_map" &&
+                                      part.state === "output-available"
+                                    ) {
+                                      const payload =
+                                        part.output as ShowMapInput
+                                      return (
+                                        <div
+                                          key={`${message.id}-${index}`}
+                                          className="flex flex-col gap-3"
+                                        >
+                                          {payload.matches.map((match) => {
+                                            const workRoute = match.routes.find(
+                                              (route) =>
+                                                route.purpose === "work"
+                                            )
+                                            return (
+                                              <Card key={match.housing.id}>
+                                                <CardHeader>
+                                                  <CardDescription>
+                                                    {match.housing
+                                                      .communityArea ??
+                                                      match.housing
+                                                        .propertyName}
+                                                  </CardDescription>
+                                                  <CardTitle className="text-sm">
+                                                    {match.housing.address}
+                                                  </CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="text-sm text-muted-foreground">
+                                                  {workRoute && (
+                                                    <p>
+                                                      {
+                                                        workRoute.durationMinutes
+                                                      }{" "}
+                                                      min by {workRoute.mode} to
+                                                      work
+                                                    </p>
+                                                  )}
+                                                  <div className="mt-2">
+                                                    <Streamdown>
+                                                      {match.rationale}
+                                                    </Streamdown>
+                                                  </div>
+                                                </CardContent>
+                                              </Card>
+                                            )
+                                          })}
+                                        </div>
+                                      )
+                                    }
+                                    return null
                                   })}
-                                </div>
-                              )
-                            }
-                            return null
-                          })}
-                        </MessageContent>
-                      </Message>
-                    ))}
-                  </div>
+                                </MessageContent>
+                              </Message>
+                            </MessageScrollerItem>
+                          ))}
+                        </MessageScrollerContent>
+                      </MessageScrollerViewport>
+                      <MessageScrollerButton />
+                    </MessageScroller>
+                  </MessageScrollerProvider>
 
                   <form
                     className="grid shrink-0 grid-cols-[1fr_auto] gap-2 border-t p-3"
