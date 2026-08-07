@@ -8,8 +8,7 @@ export interface Home {
   address: string
   rent: number
   beds: number
-  x: number
-  y: number
+  coordinates: [number, number]
   trainMinutes: number
 }
 
@@ -48,8 +47,7 @@ export const homes: Home[] = [
     address: "1660 W Juneway Ter",
     rent: 910,
     beds: 1,
-    x: 54,
-    y: 8,
+    coordinates: [-87.673, 42.022],
     trainMinutes: 47,
   },
   {
@@ -59,8 +57,7 @@ export const homes: Home[] = [
     address: "5858 N Broadway",
     rent: 1040,
     beds: 1,
-    x: 59,
-    y: 17,
+    coordinates: [-87.66, 41.989],
     trainMinutes: 38,
   },
   {
@@ -70,8 +67,7 @@ export const homes: Home[] = [
     address: "4747 N Kedzie Ave",
     rent: 980,
     beds: 2,
-    x: 38,
-    y: 24,
+    coordinates: [-87.708, 41.968],
     trainMinutes: 37,
   },
   {
@@ -81,8 +77,7 @@ export const homes: Home[] = [
     address: "1036 W Wilson Ave",
     rent: 1115,
     beds: 1,
-    x: 58,
-    y: 26,
+    coordinates: [-87.655, 41.965],
     trainMinutes: 31,
   },
   {
@@ -92,8 +87,7 @@ export const homes: Home[] = [
     address: "3020 N Milwaukee Ave",
     rent: 1085,
     beds: 2,
-    x: 39,
-    y: 35,
+    coordinates: [-87.718, 41.936],
     trainMinutes: 29,
   },
   {
@@ -103,8 +97,7 @@ export const homes: Home[] = [
     address: "2200 N Kedzie Blvd",
     rent: 1160,
     beds: 1,
-    x: 40,
-    y: 43,
+    coordinates: [-87.707, 41.921],
     trainMinutes: 25,
   },
   {
@@ -114,8 +107,7 @@ export const homes: Home[] = [
     address: "3150 N Ashland Ave",
     rent: 1210,
     beds: 1,
-    x: 57,
-    y: 36,
+    coordinates: [-87.668, 41.939],
     trainMinutes: 28,
   },
   {
@@ -125,8 +117,7 @@ export const homes: Home[] = [
     address: "3450 W Division St",
     rent: 950,
     beds: 2,
-    x: 33,
-    y: 51,
+    coordinates: [-87.713, 41.903],
     trainMinutes: 34,
   },
   {
@@ -136,8 +127,7 @@ export const homes: Home[] = [
     address: "1450 W Chicago Ave",
     rent: 1250,
     beds: 1,
-    x: 48,
-    y: 56,
+    coordinates: [-87.664, 41.896],
     trainMinutes: 19,
   },
   {
@@ -147,8 +137,7 @@ export const homes: Home[] = [
     address: "2100 W Madison St",
     rent: 1185,
     beds: 2,
-    x: 43,
-    y: 65,
+    coordinates: [-87.679, 41.881],
     trainMinutes: 16,
   },
   {
@@ -158,8 +147,7 @@ export const homes: Home[] = [
     address: "520 S Dearborn St",
     rent: 1340,
     beds: 0,
-    x: 61,
-    y: 65,
+    coordinates: [-87.629, 41.875],
     trainMinutes: 8,
   },
   {
@@ -169,8 +157,7 @@ export const homes: Home[] = [
     address: "3001 S King Dr",
     rent: 1060,
     beds: 2,
-    x: 62,
-    y: 76,
+    coordinates: [-87.616, 41.84],
     trainMinutes: 23,
   },
   {
@@ -180,8 +167,7 @@ export const homes: Home[] = [
     address: "2750 W Cermak Rd",
     rent: 930,
     beds: 2,
-    x: 39,
-    y: 76,
+    coordinates: [-87.694, 41.852],
     trainMinutes: 30,
   },
   {
@@ -191,8 +177,7 @@ export const homes: Home[] = [
     address: "6300 S Halsted St",
     rent: 875,
     beds: 2,
-    x: 50,
-    y: 89,
+    coordinates: [-87.645, 41.779],
     trainMinutes: 42,
   },
   {
@@ -202,8 +187,7 @@ export const homes: Home[] = [
     address: "5500 S Woodlawn Ave",
     rent: 1095,
     beds: 1,
-    x: 66,
-    y: 86,
+    coordinates: [-87.596, 41.795],
     trainMinutes: 34,
   },
   {
@@ -213,8 +197,7 @@ export const homes: Home[] = [
     address: "7500 S South Shore Dr",
     rent: 895,
     beds: 2,
-    x: 70,
-    y: 94,
+    coordinates: [-87.552, 41.76],
     trainMinutes: 49,
   },
 ]
