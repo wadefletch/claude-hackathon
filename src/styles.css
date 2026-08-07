@@ -634,9 +634,11 @@
   .rail-destination strong { color: #294b3b; font-size: 0.73rem; line-height: 1.35; }
   .control-heading { margin-bottom: 0.85rem; }
   .control-label { margin-bottom: 0.7rem; }
-  .mode-group { display: flex; flex-direction: column; gap: 0.4rem; }
-  .mode-toggle { width: 100%; height: 2.4rem; flex: none; justify-content: flex-start; padding-inline: 0.75rem; }
-  .mode-toggle small { margin-left: auto; color: #849088; font-size: 0.6rem; }
+  .mode-group { display: flex; width: 100%; max-width: 100%; flex-direction: column; gap: 0.4rem; overflow: hidden; }
+  .mode-toggle { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; height: 2.4rem; flex: none; justify-content: flex-start; overflow: hidden; padding-inline: 0.75rem; }
+  .mode-toggle svg { flex: 0 0 auto; }
+  .mode-toggle > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mode-toggle small { min-width: 0; margin-left: auto; overflow: hidden; color: #849088; font-size: 0.6rem; text-overflow: ellipsis; white-space: nowrap; }
   .mode-toggle[data-pressed] small { color: #3c6b53; }
   .optimizer-buttons { flex-direction: column; }
   .optimizer-buttons button { width: 100%; justify-content: flex-start; }
@@ -652,16 +654,20 @@
 
   .workspace {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(260px, 0.55fr);
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
     width: 100%;
     max-width: none;
-    height: 760px;
+    height: auto;
     margin: 0;
     padding: 0;
   }
-  .map-panel { border-radius: 1rem 0 0 1rem; }
+  .map-panel { border-radius: 1rem; }
   .chicago-map { height: 650px; }
-  .results-panel { border-radius: 0 1rem 1rem 0; }
+  .results-panel { border-left: 1px solid rgb(25 63 46 / 0.12); border-radius: 1rem; }
+  .result-list { flex-direction: row; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; overscroll-behavior-inline: contain; }
+  .result-card { flex: 0 0 clamp(280px, 34vw, 340px); scroll-snap-align: start; }
+  .empty-state { width: 100%; min-height: 220px; }
 
   .agent-panel { display: flex; height: 760px; flex-direction: column; position: sticky; top: 1rem; }
   .agent-header { display: flex; align-items: center; gap: 0.65rem; padding: 1rem; border-bottom: 1px solid rgb(28 66 49 / 0.1); }
@@ -702,8 +708,8 @@
 
 @media (max-width: 980px) {
   .workspace { height: auto; grid-template-columns: 1fr; }
-  .map-panel { border-radius: 1rem 1rem 0 0; }
-  .results-panel { max-height: 560px; border-top: 0; border-left: 1px solid rgb(25 63 46 / 0.12); border-radius: 0 0 1rem 1rem; }
+  .map-panel { border-radius: 1rem; }
+  .results-panel { max-height: none; border-top: 1px solid rgb(25 63 46 / 0.12); border-left: 1px solid rgb(25 63 46 / 0.12); border-radius: 1rem; }
   .chicago-map { height: 520px; }
 }
 
