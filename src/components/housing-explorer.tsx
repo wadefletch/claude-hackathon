@@ -65,7 +65,12 @@ import type { Optimizer, TravelMode } from "@/lib/housing-data"
 import { getBuildingReviewData } from "@/lib/building-reviews"
 import { getNeighborhoodSnapshot } from "@/lib/neighborhood-data"
 import type { ShowMapInput } from "@/lib/agent/schemas"
-import type { HousingDevelopment, TransportMode } from "@/domain"
+import type {
+  HousingDevelopment,
+  ProfilePatch,
+  TransportMode,
+  WorkLocation,
+} from "@/domain"
 import { AgentMarkdown } from "@/components/agent-markdown"
 import { cn } from "@/lib/utils"
 
@@ -138,6 +143,7 @@ export function HousingExplorer({
   >("overview")
   const detailDialogRef = useRef<HTMLDialogElement>(null)
   const detailTriggerRef = useRef<HTMLElement | null>(null)
+  const chatScrollRef = useRef<HTMLDivElement>(null)
   const {
     messages: chatMessages,
     sendMessage: sendChatMessage,
@@ -180,6 +186,37 @@ export function HousingExplorer({
     })
   }, [latestShowMapOutput, navigate])
 
+  // The agent calls update_profile as soon as it learns something (often in
+  // its very first reply) and only calls show_map once the whole multi-step
+  // search finishes — which can take a while. Scanning every message for
+  // either tool's output (not just the final show_map) means the sidebar
+  // updates as soon as the agent knows the work location, not once the full
+  // search is done.
+  const latestAgentWorkLocation = useMemo(() => {
+    let work: WorkLocation | undefined
+    for (const message of chatMessages) {
+      for (const part of message.parts) {
+        if (
+          part.type === "tool-update_profile" &&
+          part.state === "output-available"
+        ) {
+          const patch = part.output as ProfilePatch
+          const member = patch.members?.find((m) => m.work)
+          if (member?.work) work = member.work
+        }
+        if (
+          part.type === "tool-show_map" &&
+          part.state === "output-available"
+        ) {
+          const payload = part.output as ShowMapInput
+          const member = payload.profile.members.find((m) => m.work)
+          if (member?.work) work = member.work
+        }
+      }
+    }
+    return work
+  }, [chatMessages])
+
   // Reflect what the agent learned in the sidebar's own filter controls, so a
   // conversation like "I work at 200 W Madison and take the train" visibly
   // updates Destination/Maximum commute/Travel mode instead of only showing
@@ -187,9 +224,7 @@ export function HousingExplorer({
   // sidebar's home listings still come from the separate demo dataset, not
   // from the agent's own search results (those render inline in the chat).
   useEffect(() => {
-    const profile = latestShowMapOutput?.profile
-    const workingMember = profile?.members.find((member) => member.work)
-    const work = workingMember?.work
+    const work = latestAgentWorkLocation
     if (!work) return
 
     setManualMode(AGENT_MODE_TO_TRAVEL_MODE[work.preferredMode])
@@ -201,7 +236,7 @@ export function HousingExplorer({
       label: work.label ?? work.address ?? DEFAULT_WORK_LOCATION.label,
       coordinates: [work.lng, work.lat],
     })
-  }, [latestShowMapOutput])
+  }, [latestAgentWorkLocation])
 
   useEffect(() => {
     if (explorer.results.some((home) => home.id === selectedId)) return
@@ -220,6 +255,15 @@ export function HousingExplorer({
     const dialog = detailDialogRef.current
     if (isDetailOpen && dialog && !dialog.open) dialog.showModal()
   }, [isDetailOpen, selectedId])
+
+  // Keep the chat thread pinned to the latest content — new messages and
+  // streamed tokens both update `chatMessages`, so this fires continuously
+  // while the agent is replying, not just when a full message completes.
+  useEffect(() => {
+    const container = chatScrollRef.current
+    if (!container) return
+    container.scrollTop = container.scrollHeight
+  }, [chatMessages])
 
   const openBuildingDetail = (id: string, trigger: HTMLElement) => {
     detailTriggerRef.current = trigger
@@ -246,6 +290,12 @@ export function HousingExplorer({
   const selectManualMode = (mode: TravelMode) => {
     setManualMode(mode)
     setOptimizer(null)
+  }
+
+  const submitChatMessage = () => {
+    if (!chatInput.trim() || chatStatus === "streaming") return
+    sendChatMessage({ text: chatInput })
+    setChatInput("")
   }
 
   const ActiveModeIcon = modeIcons[activeMode]
@@ -355,23 +405,6 @@ export function HousingExplorer({
 
   return (
     <main className="min-h-svh bg-background text-foreground lg:flex lg:h-svh lg:flex-col lg:overflow-hidden">
-      <header className="flex h-16 shrink-0 items-center justify-between border-b bg-background/95 px-3 backdrop-blur sm:px-4">
-        <a
-          className="inline-flex items-center gap-2 text-sm font-medium"
-          href="#top"
-          aria-label="Qualifind home"
-        >
-          <span
-            className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground"
-            aria-hidden="true"
-          >
-            <SearchCheck className="size-4" />
-          </span>
-          <span>Qualifind</span>
-        </a>
-        <Badge variant="outline">Chicago, IL</Badge>
-      </header>
-
       <div
         className="flex w-full flex-col gap-4 px-3 pt-4 pb-12 sm:px-4 lg:min-h-0 lg:flex-1 lg:flex-row lg:pb-4"
         id="top"
@@ -380,6 +413,13 @@ export function HousingExplorer({
           className="flex h-[520px] w-full shrink-0 flex-col overflow-hidden rounded-xl border bg-card lg:h-auto lg:w-[380px]"
           aria-label="Housing and commute filters"
         >
+          <div className="flex h-16 shrink-0 items-center border-b px-4">
+            <img
+              src="/qualifind-logo.svg"
+              alt="QualiFind"
+              className="h-10 w-auto"
+            />
+          </div>
           <Tabs
             defaultValue="filters"
             className="flex h-full min-h-0 flex-col gap-0"
@@ -460,12 +500,22 @@ export function HousingExplorer({
                 >
                   Travel mode
                 </h3>
+                {/* Controlled by activeMode (not manualMode) so that picking a
+                    "Optimize for" preset, which resolves to a travel mode of
+                    its own, highlights that mode here too. */}
                 <ToggleGroup
                   variant="outline"
                   orientation="vertical"
                   spacing={1}
                   aria-label="Travel mode"
                   className="w-full"
+                  value={[activeMode]}
+                  onValueChange={(value) => {
+                    // Deselecting the active mode yields an empty array; keep
+                    // the current mode rather than leaving nothing selected.
+                    const next = value.at(-1) as TravelMode | undefined
+                    if (next) selectManualMode(next)
+                  }}
                 >
                   {(Object.keys(modes) as TravelMode[]).map((mode) => {
                     const Icon = modeIcons[mode]
@@ -473,10 +523,6 @@ export function HousingExplorer({
                       <ToggleGroupItem
                         key={mode}
                         value={mode}
-                        pressed={!optimizer && manualMode === mode}
-                        onPressedChange={(pressed) =>
-                          pressed && selectManualMode(mode)
-                        }
                         aria-label={`${modes[mode].label}, $${modes[mode].monthlyCost} monthly travel cost`}
                         className="w-full justify-start"
                       >
@@ -606,7 +652,10 @@ export function HousingExplorer({
                 Ask about commute, budget, or eligibility
               </p>
 
-              <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
+              <div
+                ref={chatScrollRef}
+                className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4"
+              >
                 {chatMessages.length === 0 && (
                   <div className="flex items-start gap-2">
                     <span
@@ -723,9 +772,7 @@ export function HousingExplorer({
                 className="grid shrink-0 grid-cols-[1fr_auto] gap-2 border-t p-3"
                 onSubmit={(event) => {
                   event.preventDefault()
-                  if (!chatInput.trim()) return
-                  sendChatMessage({ text: chatInput })
-                  setChatInput("")
+                  submitChatMessage()
                 }}
               >
                 <Label htmlFor="agent-message" className="sr-only">
@@ -736,6 +783,12 @@ export function HousingExplorer({
                   className="min-h-16 resize-none"
                   value={chatInput}
                   onChange={(event) => setChatInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault()
+                      submitChatMessage()
+                    }
+                  }}
                   placeholder="Message the housing agent"
                   rows={2}
                   disabled={chatStatus === "streaming"}
