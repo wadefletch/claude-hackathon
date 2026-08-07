@@ -5,6 +5,7 @@ import { BusFront, ShoppingBasket } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 import { TransitLayers } from "@/components/transit-layers"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Field,
   FieldGroup,
@@ -118,34 +119,39 @@ export function MapDataLayerControls({
   }
 
   return (
-    <FieldSet className="absolute top-2 left-2 z-10 min-w-40 gap-2 rounded-md border bg-background p-2.5 shadow-sm">
-      <FieldLegend variant="label" className="mb-0">
-        Map layers
-      </FieldLegend>
-      <FieldGroup className="gap-2">
-        {MAP_DATA_LAYERS.map((layer) => {
-          const Icon = layer.icon
-          const switchId = `${controlId}-${layer.id}`
+    <Card size="sm" className="absolute top-2 left-2 z-10 min-w-40 shadow-sm">
+      <CardHeader>
+        <CardTitle>Map layers</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <FieldSet>
+          <FieldLegend className="sr-only">Map layers</FieldLegend>
+          <FieldGroup className="gap-2">
+            {MAP_DATA_LAYERS.map((layer) => {
+              const Icon = layer.icon
+              const switchId = `${controlId}-${layer.id}`
 
-          return (
-            <Field key={layer.id} orientation="horizontal">
-              <FieldLabel htmlFor={switchId} title={layer.description}>
-                <Icon data-icon="inline-start" />
-                {layer.label}
-              </FieldLabel>
-              <Switch
-                id={switchId}
-                size="sm"
-                checked={visibleLayers.has(layer.id)}
-                onCheckedChange={(checked) =>
-                  setLayerVisibility(layer.id, checked)
-                }
-              />
-            </Field>
-          )
-        })}
-      </FieldGroup>
-    </FieldSet>
+              return (
+                <Field key={layer.id} orientation="horizontal">
+                  <FieldLabel htmlFor={switchId} title={layer.description}>
+                    <Icon data-icon="inline-start" />
+                    {layer.label}
+                  </FieldLabel>
+                  <Switch
+                    id={switchId}
+                    size="sm"
+                    checked={visibleLayers.has(layer.id)}
+                    onCheckedChange={(checked) =>
+                      setLayerVisibility(layer.id, checked)
+                    }
+                  />
+                </Field>
+              )
+            })}
+          </FieldGroup>
+        </FieldSet>
+      </CardContent>
+    </Card>
   )
 }
 
