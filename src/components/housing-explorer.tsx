@@ -7,6 +7,7 @@ import {
   Building2,
   BusFront,
   CarFront,
+  ChevronLeft,
   Clock3,
   DollarSign,
   ExternalLink,
@@ -81,11 +82,11 @@ import {
   MIN_RENT,
   modes,
 } from "@/lib/housing-data"
+import type { HomeResult, Optimizer, TravelMode } from "@/lib/housing-data"
 import type { LatLng } from "@/lib/agent/geo"
-import type { Optimizer, TravelMode } from "@/lib/housing-data"
 import { getBuildingReviewData } from "@/lib/building-reviews"
 import { getNeighborhoodSnapshot } from "@/lib/neighborhood-data"
-import type { ShowMapInput } from "@/lib/agent/schemas"
+import type { RankedHousingMatch, ShowMapInput } from "@/lib/agent/schemas"
 import type {
   HousingDevelopment,
   ProfilePatch,
@@ -177,8 +178,8 @@ export function HousingExplorer({
   const [detailTab, setDetailTab] = useState<
     "overview" | "reviews" | "neighborhood"
   >("overview")
-  const detailDialogRef = useRef<HTMLDialogElement>(null)
   const detailTriggerRef = useRef<HTMLElement | null>(null)
+  const matchesScrollRef = useRef<HTMLDivElement>(null)
   const {
     error: chatError,
     messages: chatMessages,
@@ -298,10 +299,15 @@ export function HousingExplorer({
     setSelectedId(agentMatches[0].housing.id)
   }, [agentMatches])
 
+  // Bring the selected home's card into view in the Matches list — e.g. after
+  // selecting it from a map marker, the card may be scrolled out of sight.
   useEffect(() => {
-    const dialog = detailDialogRef.current
-    if (isDetailOpen && dialog && !dialog.open) dialog.showModal()
-  }, [isDetailOpen, selectedId])
+    if (!selectedId) return
+    const card = matchesScrollRef.current?.querySelector(
+      `[data-home-id="${selectedId}"]`
+    )
+    card?.scrollIntoView({ block: "nearest", behavior: "smooth" })
+  }, [selectedId])
 
   const openBuildingDetail = (id: string, trigger: HTMLElement) => {
     detailTriggerRef.current = trigger
@@ -310,24 +316,14 @@ export function HousingExplorer({
     setIsDetailOpen(true)
   }
 
-  // Agent-driven matches don't have the demo review/neighborhood data the
-  // detail dialog is built around, so selecting one just highlights it on
-  // the map and in the list instead of opening that dialog.
-  const handleHomeSelect = (id: string, trigger: HTMLElement) => {
-    if (isAgentDriven) {
-      setSelectedId(id)
-      return
-    }
-    openBuildingDetail(id, trigger)
-  }
+  // Selecting a home — from a map marker or a list card — opens its detail
+  // inline in the Matches panel. Agent matches render the agent detail
+  // (routes + rationale); demo homes render the review/neighborhood detail.
+  const handleHomeSelect = openBuildingDetail
 
+  // The detail view renders inline in place of the Matches list, so closing it
+  // just swaps the list back in and returns focus to the card that opened it.
   const closeBuildingDetail = () => {
-    const dialog = detailDialogRef.current
-    if (dialog?.open) dialog.close()
-    else setIsDetailOpen(false)
-  }
-
-  const restoreDetailTriggerFocus = () => {
     setIsDetailOpen(false)
     const trigger = detailTriggerRef.current
     detailTriggerRef.current = null
@@ -349,6 +345,9 @@ export function HousingExplorer({
 
   const ActiveModeIcon = modeIcons[activeMode]
   const selectedHome = explorer.results.find((home) => home.id === selectedId)
+  const selectedAgentMatch = agentMatches.find(
+    (match) => match.housing.id === selectedId
+  )
   const mapHomes = useMemo<AppMapHome[]>(() => {
     if (isAgentDriven) {
       return agentMatches.map((match) => ({
@@ -1036,6 +1035,26 @@ export function HousingExplorer({
               className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background"
               aria-live="polite"
             >
+              {isDetailOpen && selectedAgentMatch ? (
+                <AgentMatchDetailPanel
+                  match={selectedAgentMatch}
+                  onClose={closeBuildingDetail}
+                />
+              ) : isDetailOpen &&
+                selectedHome &&
+                reviewData &&
+                neighborhoodData ? (
+                <BuildingDetailPanel
+                  home={selectedHome}
+                  reviewData={reviewData}
+                  neighborhoodData={neighborhoodData}
+                  activeMode={activeMode}
+                  detailTab={detailTab}
+                  onTabChange={setDetailTab}
+                  onClose={closeBuildingDetail}
+                />
+              ) : (
+                <>
               <div className="flex min-h-16 shrink-0 items-center justify-between border-b px-4">
                 <div>
                   <p className="text-xs text-muted-foreground">Matches</p>
@@ -1058,7 +1077,10 @@ export function HousingExplorer({
                 </Badge>
               </div>
 
-              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+              <div
+                ref={matchesScrollRef}
+                className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3"
+              >
                 {isAgentDriven ? (
                   agentMatches.map((match, index) => {
                     const workRoute = match.routes.find(
@@ -1067,6 +1089,7 @@ export function HousingExplorer({
                     return (
                       <Card
                         key={match.housing.id}
+                        data-home-id={match.housing.id}
                         className={cn(
                           "shrink-0 cursor-pointer",
                           selectedId === match.housing.id &&
@@ -1154,6 +1177,7 @@ export function HousingExplorer({
                   displayedResults.map((home) => (
                     <Card
                       key={home.id}
+                      data-home-id={home.id}
                       className={cn(
                         "shrink-0 cursor-pointer",
                         selectedId === home.id && "ring-2 ring-primary"
@@ -1235,435 +1259,591 @@ export function HousingExplorer({
                 Demo only · All listings, rents, and commute estimates are
                 fictional.
               </p>
+                </>
+              )}
             </aside>
           </ResizablePanel>
         </ResizablePanelGroup>
-
-        {isDetailOpen && selectedHome && reviewData && neighborhoodData && (
-          <dialog
-            ref={detailDialogRef}
-            className="fixed top-1/2 left-1/2 m-0 max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[960px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border-0 bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/60 backdrop:backdrop-blur-sm sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100vw-2rem)]"
-            aria-labelledby="building-detail-title"
-            aria-describedby="building-detail-description"
-            onClick={(event) => {
-              if (event.target === event.currentTarget) closeBuildingDetail()
-            }}
-            onCancel={(event) => {
-              event.preventDefault()
-              closeBuildingDetail()
-            }}
-            onClose={restoreDetailTriggerFocus}
-          >
-            <section className="flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden bg-background sm:max-h-[calc(100dvh-2rem)]">
-              <header className="flex items-start justify-between gap-4 border-b p-4 sm:items-center sm:px-6">
-                <div>
-                  <p className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
-                    Selected building
-                  </p>
-                  <h2
-                    id="building-detail-title"
-                    className="mt-1 text-xl font-medium tracking-tight"
-                  >
-                    {selectedHome.name}
-                  </h2>
-                  <p
-                    id="building-detail-description"
-                    className="mt-1 text-sm text-muted-foreground"
-                  >
-                    {selectedHome.address} · {selectedHome.neighborhood}
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-col-reverse items-end gap-2 sm:flex-row sm:items-center">
-                  <Badge variant="outline">
-                    ${selectedHome.rent.toLocaleString()}/mo
-                  </Badge>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={closeBuildingDetail}
-                    aria-label={`Close details for ${selectedHome.name}`}
-                  >
-                    <X />
-                  </Button>
-                </div>
-              </header>
-
-              <div
-                className="flex gap-1 border-b px-2 sm:px-6"
-                role="tablist"
-                aria-label={`${selectedHome.name} details`}
-                onKeyDown={(event) => {
-                  const tabs = ["overview", "reviews", "neighborhood"] as const
-                  if (
-                    event.key === "ArrowLeft" ||
-                    event.key === "ArrowRight" ||
-                    event.key === "Home" ||
-                    event.key === "End"
-                  ) {
-                    event.preventDefault()
-                    const currentIndex = tabs.indexOf(detailTab)
-                    const nextTab =
-                      event.key === "Home"
-                        ? tabs[0]
-                        : event.key === "End"
-                          ? tabs.at(-1)!
-                          : tabs[
-                              (currentIndex +
-                                (event.key === "ArrowRight" ? 1 : -1) +
-                                tabs.length) %
-                                tabs.length
-                            ]
-                    setDetailTab(nextTab)
-                    document.getElementById(`building-tab-${nextTab}`)?.focus()
-                  }
-                }}
-              >
-                <button
-                  className={cn(
-                    "min-h-12 border-b-2 border-transparent px-3 text-sm font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    detailTab === "overview" && "border-primary text-foreground"
-                  )}
-                  id="building-tab-overview"
-                  type="button"
-                  role="tab"
-                  aria-selected={detailTab === "overview"}
-                  aria-controls="building-panel-overview"
-                  tabIndex={detailTab === "overview" ? 0 : -1}
-                  onClick={() => setDetailTab("overview")}
-                >
-                  Overview
-                </button>
-                <button
-                  className={cn(
-                    "min-h-12 border-b-2 border-transparent px-3 text-sm font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    detailTab === "reviews" && "border-primary text-foreground"
-                  )}
-                  id="building-tab-reviews"
-                  type="button"
-                  role="tab"
-                  aria-selected={detailTab === "reviews"}
-                  aria-controls="building-panel-reviews"
-                  tabIndex={detailTab === "reviews" ? 0 : -1}
-                  onClick={() => setDetailTab("reviews")}
-                >
-                  Reviews
-                </button>
-                <button
-                  className={cn(
-                    "min-h-12 border-b-2 border-transparent px-3 text-sm font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    detailTab === "neighborhood" &&
-                      "border-primary text-foreground"
-                  )}
-                  id="building-tab-neighborhood"
-                  type="button"
-                  role="tab"
-                  aria-selected={detailTab === "neighborhood"}
-                  aria-controls="building-panel-neighborhood"
-                  tabIndex={detailTab === "neighborhood" ? 0 : -1}
-                  onClick={() => setDetailTab("neighborhood")}
-                >
-                  Neighborhood
-                </button>
-              </div>
-
-              <div className="overflow-y-auto">
-                {detailTab === "overview" ? (
-                  <div
-                    id="building-panel-overview"
-                    className="grid min-h-52 gap-6 p-4 focus-visible:outline-2 focus-visible:outline-ring sm:p-6 lg:grid-cols-[minmax(250px,0.8fr)_minmax(420px,1.2fr)] lg:items-center"
-                    role="tabpanel"
-                    tabIndex={0}
-                    aria-labelledby="building-tab-overview"
-                  >
-                    <div className="flex items-start gap-3">
-                      <span
-                        className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground"
-                        aria-hidden="true"
-                      >
-                        <Building2 className="size-5" />
-                      </span>
-                      <div>
-                        <h3 className="text-sm font-medium">
-                          A closer look at this match
-                        </h3>
-                        <p className="mt-1 max-w-md text-sm leading-6 text-muted-foreground">
-                          {selectedHome.name} is an affordable home in{" "}
-                          {selectedHome.neighborhood}, currently reachable
-                          within your selected commute range.
-                        </p>
-                      </div>
-                    </div>
-                    <dl className="grid grid-cols-2 overflow-hidden rounded-xl border sm:grid-cols-4">
-                      <div className="border-b p-4 sm:border-r sm:border-b-0">
-                        <dt className="text-xs text-muted-foreground">
-                          Monthly rent
-                        </dt>
-                        <dd className="mt-1 text-sm font-medium">
-                          ${selectedHome.rent.toLocaleString()}
-                        </dd>
-                      </div>
-                      <div className="border-b p-4 sm:border-r sm:border-b-0">
-                        <dt className="text-xs text-muted-foreground">
-                          Floor plan
-                        </dt>
-                        <dd className="mt-1 text-sm font-medium">
-                          {selectedHome.beds === 0
-                            ? "Studio"
-                            : `${selectedHome.beds} bedroom`}
-                        </dd>
-                      </div>
-                      <div className="border-r p-4 sm:border-r">
-                        <dt className="text-xs text-muted-foreground">
-                          {modes[activeMode].label} commute
-                        </dt>
-                        <dd className="mt-1 text-sm font-medium">
-                          {selectedHome.commute} minutes
-                        </dd>
-                      </div>
-                      <div className="p-4">
-                        <dt className="text-xs text-muted-foreground">
-                          Travel estimate
-                        </dt>
-                        <dd className="mt-1 text-sm font-medium">
-                          ${selectedHome.monthlyCost}/month
-                        </dd>
-                      </div>
-                    </dl>
-                    <aside className="col-span-full flex flex-col items-stretch justify-between gap-4 rounded-xl border bg-muted p-4 sm:flex-row sm:items-center">
-                      <div>
-                        <h3 className="text-sm font-medium">
-                          Interested in affordable housing?
-                        </h3>
-                        <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-                          The official CHA portal supports applications for
-                          Public Housing, Project-Based Voucher, and
-                          Project-Based Rental Assistance waitlists. Eligibility
-                          and waitlist availability vary.
-                        </p>
-                      </div>
-                      <Button
-                        render={
-                          <a
-                            href="https://applyonline.thecha.org/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          />
-                        }
-                        aria-label="Apply for housing on the CHA Waitlist Application portal (opens in a new tab)"
-                      >
-                        Apply for housing
-                        <ExternalLink
-                          data-icon="inline-end"
-                          aria-hidden="true"
-                        />
-                      </Button>
-                    </aside>
-                  </div>
-                ) : detailTab === "neighborhood" ? (
-                  <div
-                    id="building-panel-neighborhood"
-                    className="grid min-h-52 gap-4 p-4 focus-visible:outline-2 focus-visible:outline-ring sm:p-6"
-                    role="tabpanel"
-                    tabIndex={0}
-                    aria-labelledby="building-tab-neighborhood"
-                  >
-                    <div>
-                      <span className="inline-flex items-center gap-2 text-xs font-medium tracking-widest text-muted-foreground uppercase">
-                        <MapPin className="size-3" aria-hidden="true" />{" "}
-                        Neighborhood snapshot
-                      </span>
-                      <h3 className="mt-1 text-lg font-medium">
-                        {selectedHome.neighborhood}
-                      </h3>
-                      <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-                        {neighborhoodData.overview}
-                      </p>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <section
-                        className="flex gap-3 rounded-xl border p-4"
-                        aria-labelledby="transit-heading"
-                      >
-                        <span
-                          className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted"
-                          aria-hidden="true"
-                        >
-                          <BusFront className="size-4" />
-                        </span>
-                        <div>
-                          <h4
-                            id="transit-heading"
-                            className="text-sm font-medium"
-                          >
-                            Transit access
-                          </h4>
-                          <ul className="mt-2 flex list-disc flex-col gap-1 pl-4 text-sm text-muted-foreground">
-                            {neighborhoodData.transit.map((item) => (
-                              <li key={item}>{item}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      </section>
-                      <section
-                        className="flex gap-3 rounded-xl border p-4"
-                        aria-labelledby="essentials-heading"
-                      >
-                        <span
-                          className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted"
-                          aria-hidden="true"
-                        >
-                          <ShoppingBasket className="size-4" />
-                        </span>
-                        <div>
-                          <h4
-                            id="essentials-heading"
-                            className="text-sm font-medium"
-                          >
-                            Nearby essentials
-                          </h4>
-                          <ul className="mt-2 flex list-disc flex-col gap-1 pl-4 text-sm text-muted-foreground">
-                            {neighborhoodData.essentials.map((item) => (
-                              <li key={item}>{item}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      </section>
-                    </div>
-                    <dl className="grid overflow-hidden rounded-xl border sm:grid-cols-3">
-                      {neighborhoodData.facts.map((fact) => (
-                        <div
-                          className="border-b p-4 last:border-b-0 sm:border-r sm:border-b-0 sm:last:border-r-0"
-                          key={fact.label}
-                        >
-                          <dt className="text-xs text-muted-foreground">
-                            {fact.label}
-                          </dt>
-                          <dd className="mt-1 text-sm font-medium">
-                            {fact.value}
-                          </dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </div>
-                ) : (
-                  <div
-                    id="building-panel-reviews"
-                    className="min-h-52 p-4 focus-visible:outline-2 focus-visible:outline-ring sm:p-6"
-                    role="tabpanel"
-                    tabIndex={0}
-                    aria-labelledby="building-tab-reviews"
-                  >
-                    <div className="mb-4 grid gap-3 sm:grid-cols-[190px_minmax(0,1fr)]">
-                      <div
-                        className="grid rounded-xl border p-4"
-                        aria-label={`Overall rating ${reviewData.averageRating} out of 5 from ${reviewData.totalReviewCount} reviews`}
-                      >
-                        <span className="text-xs font-medium text-muted-foreground">
-                          Overall rating
-                        </span>
-                        <strong className="my-1 text-3xl font-medium tracking-tight">
-                          {reviewData.averageRating}
-                        </strong>
-                        <div
-                          className="flex gap-0.5 text-amber-500"
-                          aria-hidden="true"
-                        >
-                          {Array.from({ length: 5 }, (_, index) => (
-                            <Star
-                              key={index}
-                              className={cn(
-                                "size-3",
-                                index < Math.round(reviewData.averageRating) &&
-                                  "fill-current"
-                              )}
-                            />
-                          ))}
-                        </div>
-                        <small className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
-                          <UsersRound className="size-3" />{" "}
-                          {reviewData.totalReviewCount} reviews
-                        </small>
-                      </div>
-                      <div
-                        className="grid overflow-hidden rounded-xl border sm:grid-cols-3"
-                        aria-label="Ratings by source"
-                      >
-                        {reviewData.sources.map((source) => (
-                          <div
-                            className="grid content-center border-b p-4 last:border-b-0 sm:border-r sm:border-b-0 sm:last:border-r-0"
-                            key={source.source}
-                          >
-                            <span className="text-sm font-medium">
-                              {source.source}
-                            </span>
-                            <strong className="mt-2 inline-flex items-center gap-1">
-                              <Star
-                                className="size-3 fill-amber-500 text-amber-500"
-                                aria-hidden="true"
-                              />{" "}
-                              {source.rating}
-                            </strong>
-                            <small className="text-xs text-muted-foreground">
-                              {source.reviewCount} reviews
-                            </small>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 lg:grid-cols-3">
-                      {reviewData.reviews.map((review) => (
-                        <article
-                          className="flex min-w-0 flex-col rounded-xl border p-4"
-                          key={review.id}
-                        >
-                          <header className="flex items-center justify-between gap-2">
-                            <div>
-                              <span className="truncate text-sm font-medium">
-                                {review.source}
-                              </span>
-                            </div>
-                            <span
-                              className="inline-flex shrink-0 items-center gap-1 text-sm font-medium"
-                              aria-label={`${review.rating} out of 5 stars`}
-                            >
-                              <Star
-                                className="size-3 fill-amber-500 text-amber-500"
-                                aria-hidden="true"
-                              />{" "}
-                              {review.rating}
-                            </span>
-                          </header>
-                          <div className="my-3 flex items-center gap-2 text-xs text-muted-foreground">
-                            <strong>{review.author}</strong>
-                            <time dateTime={review.date}>
-                              · {review.recency}
-                            </time>
-                          </div>
-                          <p className="flex-1 text-sm leading-6 text-muted-foreground">
-                            {review.text}
-                          </p>
-                          <div
-                            className="mt-3 flex flex-wrap gap-1"
-                            aria-label="Review topics"
-                          >
-                            {review.tags.map((tag) => (
-                              <Badge key={tag} variant="secondary">
-                                {tag}
-                              </Badge>
-                            ))}
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </section>
-          </dialog>
-        )}
       </div>
     </main>
+  )
+}
+
+type DetailTab = "overview" | "reviews" | "neighborhood"
+
+// The building detail renders inline in the Matches panel (in place of the
+// list), so its layouts stay single-column to fit the narrow panel width
+// rather than the wide multi-column grids the old modal used.
+function BuildingDetailPanel({
+  home,
+  reviewData,
+  neighborhoodData,
+  activeMode,
+  detailTab,
+  onTabChange,
+  onClose,
+}: {
+  home: HomeResult
+  reviewData: NonNullable<ReturnType<typeof getBuildingReviewData>>
+  neighborhoodData: NonNullable<ReturnType<typeof getNeighborhoodSnapshot>>
+  activeMode: TravelMode
+  detailTab: DetailTab
+  onTabChange: (tab: DetailTab) => void
+  onClose: () => void
+}) {
+  return (
+    <section
+      className="flex h-full min-h-0 flex-col overflow-hidden bg-background"
+      aria-labelledby="building-detail-title"
+      aria-describedby="building-detail-description"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault()
+          onClose()
+        }
+      }}
+    >
+      <header className="flex min-h-16 shrink-0 items-start justify-between gap-3 border-b px-4 py-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="-ml-2 h-7 gap-1 px-2 text-xs"
+              onClick={onClose}
+              aria-label="Back to matches list"
+            >
+              <ChevronLeft className="size-3" /> Matches
+            </Button>
+          </div>
+          <h2
+            id="building-detail-title"
+            className="mt-1 truncate text-lg font-medium tracking-tight"
+          >
+            {home.name}
+          </h2>
+          <p
+            id="building-detail-description"
+            className="mt-0.5 truncate text-sm text-muted-foreground"
+          >
+            {home.address} · {home.neighborhood}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Badge variant="outline">${home.rent.toLocaleString()}/mo</Badge>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            aria-label={`Close details for ${home.name}`}
+          >
+            <X />
+          </Button>
+        </div>
+      </header>
+
+      <div
+        className="flex gap-1 border-b px-2"
+        role="tablist"
+        aria-label={`${home.name} details`}
+        onKeyDown={(event) => {
+          const tabs: DetailTab[] = ["overview", "reviews", "neighborhood"]
+          if (
+            event.key === "ArrowLeft" ||
+            event.key === "ArrowRight" ||
+            event.key === "Home" ||
+            event.key === "End"
+          ) {
+            event.preventDefault()
+            const currentIndex = tabs.indexOf(detailTab)
+            const nextTab =
+              event.key === "Home"
+                ? tabs[0]
+                : event.key === "End"
+                  ? tabs.at(-1)!
+                  : tabs[
+                      (currentIndex +
+                        (event.key === "ArrowRight" ? 1 : -1) +
+                        tabs.length) %
+                        tabs.length
+                    ]
+            onTabChange(nextTab)
+            document.getElementById(`building-tab-${nextTab}`)?.focus()
+          }
+        }}
+      >
+        <button
+          className={cn(
+            "min-h-12 border-b-2 border-transparent px-3 text-sm font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            detailTab === "overview" && "border-primary text-foreground"
+          )}
+          id="building-tab-overview"
+          type="button"
+          role="tab"
+          aria-selected={detailTab === "overview"}
+          aria-controls="building-panel-overview"
+          tabIndex={detailTab === "overview" ? 0 : -1}
+          onClick={() => onTabChange("overview")}
+        >
+          Overview
+        </button>
+        <button
+          className={cn(
+            "min-h-12 border-b-2 border-transparent px-3 text-sm font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            detailTab === "reviews" && "border-primary text-foreground"
+          )}
+          id="building-tab-reviews"
+          type="button"
+          role="tab"
+          aria-selected={detailTab === "reviews"}
+          aria-controls="building-panel-reviews"
+          tabIndex={detailTab === "reviews" ? 0 : -1}
+          onClick={() => onTabChange("reviews")}
+        >
+          Reviews
+        </button>
+        <button
+          className={cn(
+            "min-h-12 border-b-2 border-transparent px-3 text-sm font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            detailTab === "neighborhood" && "border-primary text-foreground"
+          )}
+          id="building-tab-neighborhood"
+          type="button"
+          role="tab"
+          aria-selected={detailTab === "neighborhood"}
+          aria-controls="building-panel-neighborhood"
+          tabIndex={detailTab === "neighborhood" ? 0 : -1}
+          onClick={() => onTabChange("neighborhood")}
+        >
+          Neighborhood
+        </button>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {detailTab === "overview" ? (
+          <div
+            id="building-panel-overview"
+            className="grid min-h-52 gap-6 p-4 focus-visible:outline-2 focus-visible:outline-ring"
+            role="tabpanel"
+            tabIndex={0}
+            aria-labelledby="building-tab-overview"
+          >
+            <div className="flex items-start gap-3">
+              <span
+                className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground"
+                aria-hidden="true"
+              >
+                <Building2 className="size-5" />
+              </span>
+              <div>
+                <h3 className="text-sm font-medium">
+                  A closer look at this match
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  {home.name} is an affordable home in {home.neighborhood},
+                  currently reachable within your selected commute range.
+                </p>
+              </div>
+            </div>
+            <dl className="grid grid-cols-2 divide-x divide-y overflow-hidden rounded-xl border">
+              <div className="p-4">
+                <dt className="text-xs text-muted-foreground">Monthly rent</dt>
+                <dd className="mt-1 text-sm font-medium">
+                  ${home.rent.toLocaleString()}
+                </dd>
+              </div>
+              <div className="p-4">
+                <dt className="text-xs text-muted-foreground">Floor plan</dt>
+                <dd className="mt-1 text-sm font-medium">
+                  {home.beds === 0 ? "Studio" : `${home.beds} bedroom`}
+                </dd>
+              </div>
+              <div className="p-4">
+                <dt className="text-xs text-muted-foreground">
+                  {modes[activeMode].label} commute
+                </dt>
+                <dd className="mt-1 text-sm font-medium">
+                  {home.commute} minutes
+                </dd>
+              </div>
+              <div className="p-4">
+                <dt className="text-xs text-muted-foreground">
+                  Travel estimate
+                </dt>
+                <dd className="mt-1 text-sm font-medium">
+                  ${home.monthlyCost}/month
+                </dd>
+              </div>
+            </dl>
+            <aside className="flex flex-col items-stretch gap-4 rounded-xl border bg-muted p-4">
+              <div>
+                <h3 className="text-sm font-medium">
+                  Interested in affordable housing?
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  The official CHA portal supports applications for Public
+                  Housing, Project-Based Voucher, and Project-Based Rental
+                  Assistance waitlists. Eligibility and waitlist availability
+                  vary.
+                </p>
+              </div>
+              <Button
+                render={
+                  <a
+                    href="https://applyonline.thecha.org/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  />
+                }
+                aria-label="Apply for housing on the CHA Waitlist Application portal (opens in a new tab)"
+              >
+                Apply for housing
+                <ExternalLink data-icon="inline-end" aria-hidden="true" />
+              </Button>
+            </aside>
+          </div>
+        ) : detailTab === "neighborhood" ? (
+          <div
+            id="building-panel-neighborhood"
+            className="grid min-h-52 gap-4 p-4 focus-visible:outline-2 focus-visible:outline-ring"
+            role="tabpanel"
+            tabIndex={0}
+            aria-labelledby="building-tab-neighborhood"
+          >
+            <div>
+              <span className="inline-flex items-center gap-2 text-xs font-medium tracking-widest text-muted-foreground uppercase">
+                <MapPin className="size-3" aria-hidden="true" /> Neighborhood
+                snapshot
+              </span>
+              <h3 className="mt-1 text-lg font-medium">{home.neighborhood}</h3>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                {neighborhoodData.overview}
+              </p>
+            </div>
+            <div className="grid gap-3">
+              <section
+                className="flex gap-3 rounded-xl border p-4"
+                aria-labelledby="transit-heading"
+              >
+                <span
+                  className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted"
+                  aria-hidden="true"
+                >
+                  <BusFront className="size-4" />
+                </span>
+                <div>
+                  <h4 id="transit-heading" className="text-sm font-medium">
+                    Transit access
+                  </h4>
+                  <ul className="mt-2 flex list-disc flex-col gap-1 pl-4 text-sm text-muted-foreground">
+                    {neighborhoodData.transit.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </section>
+              <section
+                className="flex gap-3 rounded-xl border p-4"
+                aria-labelledby="essentials-heading"
+              >
+                <span
+                  className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted"
+                  aria-hidden="true"
+                >
+                  <ShoppingBasket className="size-4" />
+                </span>
+                <div>
+                  <h4 id="essentials-heading" className="text-sm font-medium">
+                    Nearby essentials
+                  </h4>
+                  <ul className="mt-2 flex list-disc flex-col gap-1 pl-4 text-sm text-muted-foreground">
+                    {neighborhoodData.essentials.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </section>
+            </div>
+            <dl className="grid overflow-hidden rounded-xl border">
+              {neighborhoodData.facts.map((fact) => (
+                <div
+                  className="border-b p-4 last:border-b-0"
+                  key={fact.label}
+                >
+                  <dt className="text-xs text-muted-foreground">
+                    {fact.label}
+                  </dt>
+                  <dd className="mt-1 text-sm font-medium">{fact.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ) : (
+          <div
+            id="building-panel-reviews"
+            className="min-h-52 p-4 focus-visible:outline-2 focus-visible:outline-ring"
+            role="tabpanel"
+            tabIndex={0}
+            aria-labelledby="building-tab-reviews"
+          >
+            <div className="mb-4 grid gap-3">
+              <div
+                className="grid rounded-xl border p-4"
+                aria-label={`Overall rating ${reviewData.averageRating} out of 5 from ${reviewData.totalReviewCount} reviews`}
+              >
+                <span className="text-xs font-medium text-muted-foreground">
+                  Overall rating
+                </span>
+                <strong className="my-1 text-3xl font-medium tracking-tight">
+                  {reviewData.averageRating}
+                </strong>
+                <div className="flex gap-0.5 text-amber-500" aria-hidden="true">
+                  {Array.from({ length: 5 }, (_, index) => (
+                    <Star
+                      key={index}
+                      className={cn(
+                        "size-3",
+                        index < Math.round(reviewData.averageRating) &&
+                          "fill-current"
+                      )}
+                    />
+                  ))}
+                </div>
+                <small className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
+                  <UsersRound className="size-3" /> {reviewData.totalReviewCount}{" "}
+                  reviews
+                </small>
+              </div>
+              <div
+                className="grid overflow-hidden rounded-xl border sm:grid-cols-3"
+                aria-label="Ratings by source"
+              >
+                {reviewData.sources.map((source) => (
+                  <div
+                    className="grid content-center border-b p-4 last:border-b-0 sm:border-r sm:border-b-0 sm:last:border-r-0"
+                    key={source.source}
+                  >
+                    <span className="text-sm font-medium">{source.source}</span>
+                    <strong className="mt-2 inline-flex items-center gap-1">
+                      <Star
+                        className="size-3 fill-amber-500 text-amber-500"
+                        aria-hidden="true"
+                      />{" "}
+                      {source.rating}
+                    </strong>
+                    <small className="text-xs text-muted-foreground">
+                      {source.reviewCount} reviews
+                    </small>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-3">
+              {reviewData.reviews.map((review) => (
+                <article
+                  className="flex min-w-0 flex-col rounded-xl border p-4"
+                  key={review.id}
+                >
+                  <header className="flex items-center justify-between gap-2">
+                    <div>
+                      <span className="truncate text-sm font-medium">
+                        {review.source}
+                      </span>
+                    </div>
+                    <span
+                      className="inline-flex shrink-0 items-center gap-1 text-sm font-medium"
+                      aria-label={`${review.rating} out of 5 stars`}
+                    >
+                      <Star
+                        className="size-3 fill-amber-500 text-amber-500"
+                        aria-hidden="true"
+                      />{" "}
+                      {review.rating}
+                    </span>
+                  </header>
+                  <div className="my-3 flex items-center gap-2 text-xs text-muted-foreground">
+                    <strong>{review.author}</strong>
+                    <time dateTime={review.date}>· {review.recency}</time>
+                  </div>
+                  <p className="flex-1 text-sm leading-6 text-muted-foreground">
+                    {review.text}
+                  </p>
+                  <div
+                    className="mt-3 flex flex-wrap gap-1"
+                    aria-label="Review topics"
+                  >
+                    {review.tags.map((tag) => (
+                      <Badge key={tag} variant="secondary">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+// Inline detail for an agent-produced match. Agent matches carry routes and a
+// plain-language rationale rather than the demo review/neighborhood data, so
+// this shows those instead of the tabbed BuildingDetailPanel.
+function AgentMatchDetailPanel({
+  match,
+  onClose,
+}: {
+  match: RankedHousingMatch
+  onClose: () => void
+}) {
+  const { housing } = match
+  return (
+    <section
+      className="flex h-full min-h-0 flex-col overflow-hidden bg-background"
+      aria-labelledby="agent-detail-title"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault()
+          onClose()
+        }
+      }}
+    >
+      <header className="flex min-h-16 shrink-0 items-start justify-between gap-3 border-b px-4 py-3">
+        <div className="min-w-0">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="-ml-2 h-7 gap-1 px-2 text-xs"
+            onClick={onClose}
+            aria-label="Back to matches list"
+          >
+            <ChevronLeft className="size-3" /> Matches
+          </Button>
+          <h2
+            id="agent-detail-title"
+            className="mt-1 truncate text-lg font-medium tracking-tight"
+          >
+            {housing.propertyName}
+          </h2>
+          <p className="mt-0.5 truncate text-sm text-muted-foreground">
+            {housing.communityArea
+              ? `${housing.address} · ${housing.communityArea}`
+              : housing.address}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Badge variant="outline">
+            {match.rentUsd ? `$${match.rentUsd.toLocaleString()}/mo` : "Ask"}
+          </Badge>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            aria-label={`Close details for ${housing.propertyName}`}
+          >
+            <X />
+          </Button>
+        </div>
+      </header>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+        <dl className="grid grid-cols-2 divide-x divide-y overflow-hidden rounded-xl border">
+          <div className="p-4">
+            <dt className="text-xs text-muted-foreground">Monthly rent</dt>
+            <dd className="mt-1 text-sm font-medium">
+              {match.rentUsd ? `$${match.rentUsd.toLocaleString()}` : "Ask"}
+            </dd>
+          </div>
+          <div className="p-4">
+            <dt className="text-xs text-muted-foreground">Floor plan</dt>
+            <dd className="mt-1 text-sm font-medium">
+              {match.bedrooms === undefined
+                ? "Ask"
+                : match.bedrooms === 0
+                  ? "Studio"
+                  : `${match.bedrooms} bed`}
+            </dd>
+          </div>
+        </dl>
+
+        {match.routes.length > 0 && (
+          <section aria-labelledby="agent-routes-heading">
+            <h3
+              id="agent-routes-heading"
+              className="mb-2 text-xs font-medium tracking-widest text-muted-foreground uppercase"
+            >
+              Commute &amp; nearby
+            </h3>
+            <ul className="grid gap-2">
+              {match.routes.map((route, index) => (
+                <li
+                  key={`${route.destinationId}-${route.mode}-${index}`}
+                  className="flex items-center gap-3 rounded-xl border p-3 text-sm"
+                >
+                  <span
+                    className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground"
+                    aria-hidden="true"
+                  >
+                    <Clock3 className="size-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="font-medium">
+                      {route.durationMinutes} min by {route.mode}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      to {route.destinationLabel ?? route.purpose}
+                      {route.estimate ? " · estimated" : ""}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <section aria-labelledby="agent-rationale-heading">
+          <h3
+            id="agent-rationale-heading"
+            className="mb-2 text-xs font-medium tracking-widest text-muted-foreground uppercase"
+          >
+            Why this match
+          </h3>
+          <Streamdown>{match.rationale}</Streamdown>
+        </section>
+
+        <aside className="flex flex-col items-stretch gap-4 rounded-xl border bg-muted p-4">
+          <div>
+            <h3 className="text-sm font-medium">
+              Interested in affordable housing?
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              The official CHA portal supports applications for Public Housing,
+              Project-Based Voucher, and Project-Based Rental Assistance
+              waitlists. Eligibility and waitlist availability vary.
+            </p>
+          </div>
+          <Button
+            render={
+              <a
+                href="https://applyonline.thecha.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+              />
+            }
+            aria-label="Apply for housing on the CHA Waitlist Application portal (opens in a new tab)"
+          >
+            Apply for housing
+            <ExternalLink data-icon="inline-end" aria-hidden="true" />
+          </Button>
+        </aside>
+      </div>
+    </section>
   )
 }

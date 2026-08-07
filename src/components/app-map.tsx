@@ -448,8 +448,9 @@ function HomeMarker({
         <button
           type="button"
           className={cn(
-            "grid size-8 place-items-center rounded-full border-2 border-primary-foreground bg-primary text-primary-foreground shadow-sm transition-transform focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring",
-            isSelected && "scale-110 ring-4 ring-primary/20",
+            "grid size-8 cursor-pointer place-items-center rounded-full border-2 border-primary-foreground bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-110 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring",
+            isSelected &&
+              "relative z-10 scale-125 bg-sky-600 shadow-lg ring-4 ring-sky-500/40 hover:scale-125",
             isWinner && "bg-amber-600"
           )}
           aria-label={`${home.label}${home.rent ? `, $${home.rent} rent` : ""}`}
