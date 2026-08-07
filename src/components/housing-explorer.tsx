@@ -80,6 +80,9 @@ export function HousingExplorer() {
   const [maxMinutes, setMaxMinutes] = useState(35)
   const [manualMode, setManualMode] = useState<TravelMode>("train")
   const [optimizer, setOptimizer] = useState<Optimizer | null>(null)
+  const [activeSidebarTab, setActiveSidebarTab] = useState<"search" | "agent">(
+    "search"
+  )
   const explorer = useMemo(
     () =>
       optimizer
@@ -254,26 +257,78 @@ export function HousingExplorer() {
         <Badge variant="outline">Chicago, IL</Badge>
       </header>
 
-      <section
-        className="mx-auto w-full max-w-[1800px] px-4 py-8 sm:px-8 xl:px-10"
+      <div
         id="top"
+        className="mx-auto grid w-full max-w-[1800px] grid-cols-1 items-start gap-4 px-3 pb-12 sm:px-4 lg:grid-cols-[300px_minmax(0,1fr)] lg:grid-rows-[auto_1fr] xl:px-10"
       >
-        <p className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
-          Affordable housing · commute explorer
-        </p>
-        <h1 className="mt-2 text-3xl font-medium tracking-tight sm:text-5xl">
-          Find a home that gets you there.
-        </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-          Compare affordable homes across Chicago by commute time and monthly
-          travel cost.
-        </p>
-      </section>
-
-      <div className="mx-auto grid w-full max-w-[1800px] grid-cols-1 items-start gap-4 px-3 pb-12 sm:px-4 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(560px,1fr)_350px] xl:px-10">
+        <div
+          role="tablist"
+          aria-label="Housing explorer tools"
+          className="grid grid-cols-2 gap-1 rounded-xl border bg-card p-1 lg:col-start-1 lg:row-start-1"
+          onKeyDown={(event) => {
+            if (
+              event.key !== "ArrowLeft" &&
+              event.key !== "ArrowRight" &&
+              event.key !== "Home" &&
+              event.key !== "End"
+            ) {
+              return
+            }
+            event.preventDefault()
+            const nextTab =
+              event.key === "ArrowLeft" || event.key === "Home"
+                ? "search"
+                : "agent"
+            setActiveSidebarTab(nextTab)
+            requestAnimationFrame(() => {
+              document.getElementById(`${nextTab}-tab`)?.focus()
+            })
+          }}
+        >
+          <button
+            type="button"
+            role="tab"
+            id="search-tab"
+            aria-selected={activeSidebarTab === "search"}
+            aria-controls="search-panel"
+            tabIndex={activeSidebarTab === "search" ? 0 : -1}
+            onClick={() => setActiveSidebarTab("search")}
+            className={cn(
+              "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+              activeSidebarTab === "search"
+                ? "bg-muted text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <SlidersHorizontal className="size-4" /> Search
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="agent-tab"
+            aria-selected={activeSidebarTab === "agent"}
+            aria-controls="agent-panel"
+            tabIndex={activeSidebarTab === "agent" ? 0 : -1}
+            onClick={() => setActiveSidebarTab("agent")}
+            className={cn(
+              "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+              activeSidebarTab === "agent"
+                ? "bg-muted text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Bot className="size-4" /> Agent
+          </button>
+        </div>
         <aside
-          className="flex flex-col overflow-hidden rounded-xl border bg-card p-4 lg:h-[760px]"
+          id="search-panel"
+          role="tabpanel"
+          aria-labelledby="search-tab"
           aria-label="Housing and commute filters"
+          className={cn(
+            "flex-col overflow-x-hidden overflow-y-auto rounded-xl border bg-card p-4 lg:col-start-1 lg:row-start-2 lg:h-[760px]",
+            activeSidebarTab === "search" ? "flex" : "hidden"
+          )}
         >
           <div className="flex items-center gap-3 pb-4">
             <span
@@ -446,7 +501,7 @@ export function HousingExplorer() {
         </aside>
 
         <section
-          className="grid min-w-0 gap-3"
+          className="grid min-w-0 gap-3 lg:col-start-2 lg:row-start-1 lg:row-span-2"
           aria-label="Housing results and map"
         >
           <div className="min-w-0 overflow-hidden rounded-xl border bg-card">
@@ -1028,8 +1083,13 @@ export function HousingExplorer() {
         )}
 
         <aside
-          className="flex h-[480px] flex-col overflow-hidden rounded-xl border bg-card lg:col-span-2 xl:sticky xl:top-4 xl:col-span-1 xl:h-[760px]"
-          aria-labelledby="agent-title"
+          id="agent-panel"
+          role="tabpanel"
+          aria-labelledby="agent-tab agent-title"
+          className={cn(
+            "h-[560px] flex-col overflow-hidden rounded-xl border bg-card lg:col-start-1 lg:row-start-2 lg:h-[760px]",
+            activeSidebarTab === "agent" ? "flex" : "hidden"
+          )}
         >
           <header className="flex items-center gap-3 border-b p-4">
             <span
