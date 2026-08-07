@@ -63,7 +63,7 @@ import type { Optimizer, TravelMode } from "@/lib/housing-data"
 import { getBuildingReviewData } from "@/lib/building-reviews"
 import { getNeighborhoodSnapshot } from "@/lib/neighborhood-data"
 import type { ShowMapInput } from "@/lib/agent/schemas"
-import type { TransportMode } from "@/domain"
+import type { ProfilePatch, TransportMode, WorkLocation } from "@/domain"
 import { AgentMarkdown } from "@/components/agent-markdown"
 import { cn } from "@/lib/utils"
 
@@ -154,6 +154,37 @@ export function HousingExplorer() {
     })
   }, [latestShowMapOutput, navigate])
 
+  // The agent calls update_profile as soon as it learns something (often in
+  // its very first reply) and only calls show_map once the whole multi-step
+  // search finishes — which can take a while. Scanning every message for
+  // either tool's output (not just the final show_map) means the sidebar
+  // updates as soon as the agent knows the work location, not once the full
+  // search is done.
+  const latestAgentWorkLocation = useMemo(() => {
+    let work: WorkLocation | undefined
+    for (const message of chatMessages) {
+      for (const part of message.parts) {
+        if (
+          part.type === "tool-update_profile" &&
+          part.state === "output-available"
+        ) {
+          const patch = part.output as ProfilePatch
+          const member = patch.members?.find((m) => m.work)
+          if (member?.work) work = member.work
+        }
+        if (
+          part.type === "tool-show_map" &&
+          part.state === "output-available"
+        ) {
+          const payload = part.output as ShowMapInput
+          const member = payload.profile.members.find((m) => m.work)
+          if (member?.work) work = member.work
+        }
+      }
+    }
+    return work
+  }, [chatMessages])
+
   // Reflect what the agent learned in the sidebar's own filter controls, so a
   // conversation like "I work at 200 W Madison and take the train" visibly
   // updates Destination/Maximum commute/Travel mode instead of only showing
@@ -161,9 +192,7 @@ export function HousingExplorer() {
   // sidebar's home listings still come from the separate demo dataset, not
   // from the agent's own search results (those render inline in the chat).
   useEffect(() => {
-    const profile = latestShowMapOutput?.profile
-    const workingMember = profile?.members.find((member) => member.work)
-    const work = workingMember?.work
+    const work = latestAgentWorkLocation
     if (!work) return
 
     setManualMode(AGENT_MODE_TO_TRAVEL_MODE[work.preferredMode])
@@ -175,7 +204,7 @@ export function HousingExplorer() {
       label: work.label ?? work.address ?? DEFAULT_WORK_LOCATION.label,
       coordinates: [work.lng, work.lat],
     })
-  }, [latestShowMapOutput])
+  }, [latestAgentWorkLocation])
 
   useEffect(() => {
     if (explorer.results.some((home) => home.id === selectedId)) return
