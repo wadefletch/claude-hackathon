@@ -23,9 +23,6 @@ importers:
       '@mediapipe/tasks-vision':
         specifier: ^1.0.1
         version: 1.0.1
-      '@shadcn/helpers':
-        specifier: ^0.1.0
-        version: 0.1.0(ai@7.0.55(zod@4.4.3))
       '@shadcn/react':
         specifier: ^0.3.0
         version: 0.3.0(@types/react@19.2.18)(react@19.2.8)
@@ -979,20 +976,6 @@ packages:
 
   '@sec-ant/readable-stream@0.4.1':
     resolution: {integrity: sha512-831qok9r2t8AlxLko40y2ebgSDhenenCatLVeW/uBtnHPyhHOvG0C7TvfgecV+wHzIm5KUICgzmVpWS+IMEAeg==}
-
-  '@shadcn/helpers@0.1.0':
-    resolution: {integrity: sha512-A80apw7i2ZcuwgKKW51zmPSaUXfzLeAQ28XmACB/KeIAVA7PQuaON1hyIEHU3yvk9oriCaWuzU20r0CgieYmmA==}
-    peerDependencies:
-      '@tanstack/ai': '>=0.40.0 <0.41.0'
-      '@tanstack/ai-client': '>=0.20.0 <0.21.0'
-      ai: '>=7.0.0 <8'
-    peerDependenciesMeta:
-      '@tanstack/ai':
-        optional: true
-      '@tanstack/ai-client':
-        optional: true
-      ai:
-        optional: true
 
   '@shadcn/react@0.3.0':
     resolution: {integrity: sha512-iKN0NuYe850VDHlxEfvppFrpa7CMV3zArTHusXlaSmeFeQhohGbIqclv6WwPTs/44I8EkXQpcuRt6sXEVKkWqQ==}
@@ -5482,10 +5465,6 @@ snapshots:
   '@rolldown/pluginutils@1.0.1': {}
 
   '@sec-ant/readable-stream@0.4.1': {}
-
-  '@shadcn/helpers@0.1.0(ai@7.0.55(zod@4.4.3))':
-    optionalDependencies:
-      ai: 7.0.55(zod@4.4.3)
 
   '@shadcn/react@0.3.0(@types/react@19.2.18)(react@19.2.8)':
     optionalDependencies:

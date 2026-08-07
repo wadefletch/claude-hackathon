@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useChat } from "@ai-sdk/react"
-import { createChat } from "@shadcn/helpers/ai-sdk"
 import { useNavigate } from "@tanstack/react-router"
+import { Streamdown } from "streamdown"
 import {
   Bot,
   Building2,
@@ -49,7 +49,12 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Label } from "@/components/ui/label"
-import { Message, MessageAvatar, MessageContent } from "@/components/ui/message"
+import {
+  Message,
+  MessageAvatar,
+  MessageContent,
+  MessageFooter,
+} from "@/components/ui/message"
 import {
   ResizableHandle,
   ResizablePanel,
@@ -72,7 +77,6 @@ import { getBuildingReviewData } from "@/lib/building-reviews"
 import { getNeighborhoodSnapshot } from "@/lib/neighborhood-data"
 import type { ShowMapInput } from "@/lib/agent/schemas"
 import type { ProfilePatch, TransportMode, WorkLocation } from "@/domain"
-import { AgentMarkdown } from "@/components/agent-markdown"
 import { cn } from "@/lib/utils"
 
 const modeIcons = {
@@ -86,13 +90,6 @@ const DEFAULT_WORK_LOCATION = {
   label: destination,
   coordinates: [-87.633, 41.882] as [number, number],
 }
-
-const INITIAL_CHAT_MESSAGES = createChat()
-  .assistant(
-    "Tell me about your commute, budget, and household — or check whether you qualify for affordable housing.",
-    { id: "assistant-welcome" }
-  )
-  .get()
 
 // The agent's TransportMode is a superset of this demo's TravelMode (no
 // "bike" here, so it falls back to "walk" as the closest non-motorized mode).
@@ -132,7 +129,7 @@ export function HousingExplorer() {
     messages: chatMessages,
     sendMessage: sendChatMessage,
     status: chatStatus,
-  } = useChat({ messages: INITIAL_CHAT_MESSAGES })
+  } = useChat()
   const [chatInput, setChatInput] = useState("")
   const isChatBusy = chatStatus === "submitted" || chatStatus === "streaming"
 
@@ -557,6 +554,38 @@ export function HousingExplorer() {
                     ref={chatScrollRef}
                     className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4"
                   >
+                    {chatMessages.length === 0 && (
+                      <Message>
+                        <MessageAvatar className="size-8" aria-hidden="true">
+                          <Bot />
+                        </MessageAvatar>
+                        <MessageContent>
+                          <Bubble variant="muted">
+                            <BubbleContent>
+                              Tell me about your commute, budget, and household
+                              — or check whether you qualify for affordable
+                              housing.
+                            </BubbleContent>
+                          </Bubble>
+                          <MessageFooter>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={isChatBusy}
+                              onClick={() =>
+                                void sendChatMessage({
+                                  text: "See if I qualify",
+                                })
+                              }
+                            >
+                              <SearchCheck data-icon="inline-start" /> See if I
+                              qualify
+                            </Button>
+                          </MessageFooter>
+                        </MessageContent>
+                      </Message>
+                    )}
                     {chatMessages.map((message) => (
                       <Message
                         key={message.id}
@@ -570,16 +599,9 @@ export function HousingExplorer() {
                         <MessageContent>
                           {message.parts.map((part, index) => {
                             if (part.type === "text") {
-                              const isStreaming =
-                                message.role === "assistant" &&
-                                chatStatus === "streaming" &&
-                                message.id === chatMessages.at(-1)?.id
                               return (
                                 <Bubble
                                   key={`${message.id}-${index}`}
-                                  align={
-                                    message.role === "user" ? "end" : "start"
-                                  }
                                   variant={
                                     message.role === "user"
                                       ? "default"
@@ -587,9 +609,11 @@ export function HousingExplorer() {
                                   }
                                 >
                                   <BubbleContent>
-                                    <AgentMarkdown isStreaming={isStreaming}>
-                                      {part.text}
-                                    </AgentMarkdown>
+                                    {message.role === "assistant" ? (
+                                      <Streamdown>{part.text}</Streamdown>
+                                    ) : (
+                                      part.text
+                                    )}
                                   </BubbleContent>
                                 </Bubble>
                               )
@@ -627,9 +651,9 @@ export function HousingExplorer() {
                                             </p>
                                           )}
                                           <div className="mt-2">
-                                            <AgentMarkdown>
+                                            <Streamdown>
                                               {match.rationale}
-                                            </AgentMarkdown>
+                                            </Streamdown>
                                           </div>
                                         </CardContent>
                                       </Card>
@@ -643,21 +667,6 @@ export function HousingExplorer() {
                         </MessageContent>
                       </Message>
                     ))}
-                    {chatMessages.length === INITIAL_CHAT_MESSAGES.length && (
-                      <Button
-                        className="ml-10 self-start"
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={isChatBusy}
-                        onClick={() =>
-                          void sendChatMessage({ text: "See if I qualify" })
-                        }
-                      >
-                        <SearchCheck data-icon="inline-start" /> See if I
-                        qualify
-                      </Button>
-                    )}
                   </div>
 
                   <form
