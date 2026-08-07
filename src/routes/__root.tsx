@@ -20,7 +20,7 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "Explore fictional affordable Chicago homes by commute time, travel mode, rent, and monthly transportation cost.",
+          "Explore affordable Chicago homes by commute time, travel mode, rent, and monthly transportation cost.",
       },
       {
         name: "theme-color",
