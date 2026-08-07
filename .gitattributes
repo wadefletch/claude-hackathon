@@ -1,0 +1,4 @@
+*.gen.ts linguist-generated=true
+*-lock.* linguist-generated=true
+*.lock linguist-generated=true
+*.lockb linguist-generated=true
