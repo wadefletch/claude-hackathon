@@ -288,21 +288,16 @@ export function HousingExplorer({
     setIsDetailOpen(true)
   }
 
-  // Agent-driven matches don't have the demo review/neighborhood data the
-  // detail dialog is built around, so selecting one just highlights it on
-  // the map and in the list instead of opening that dialog.
+  // Selecting a home (from a map marker or a list card) opens its detail
+  // inline in the Matches panel. Agent-driven matches don't have the demo
+  // review/neighborhood data that view is built around, so those just
+  // highlight on the map and in the list instead.
   const handleHomeSelect = (id: string, trigger: HTMLElement) => {
     if (isAgentDriven) {
       setSelectedId(id)
       return
     }
     openBuildingDetail(id, trigger)
-  }
-
-  // Clicking a map marker only selects the home — it highlights the matching
-  // card in the Matches list without opening the full detail dialog.
-  const selectHome = (id: string) => {
-    setSelectedId(id)
   }
 
   // The detail view renders inline in place of the Matches list, so closing it
@@ -914,7 +909,9 @@ export function HousingExplorer({
               <AppMap
                 className="min-h-0 flex-1 rounded-none border-0 shadow-none"
                 state={mapState}
-                onHomeSelect={(home) => selectHome(home.id)}
+                onHomeSelect={(home, trigger) =>
+                  handleHomeSelect(home.id, trigger)
+                }
                 onNeighborhoodSelect={setFocusedNeighborhood}
               />
 
