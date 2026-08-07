@@ -51,8 +51,6 @@ export function HousingExplorer() {
   const [maxMinutes, setMaxMinutes] = useState(35)
   const [manualMode, setManualMode] = useState<TravelMode>("train")
   const [optimizer, setOptimizer] = useState<Optimizer | null>(null)
-  const [reviewWants, setReviewWants] = useState("")
-  const [reviewAvoids, setReviewAvoids] = useState("")
   const explorer = useMemo(
     () =>
       optimizer
@@ -293,40 +291,6 @@ export function HousingExplorer() {
             </p>
           </section>
 
-          <Separator />
-
-          <section
-            className="filter-section review-preferences"
-            aria-labelledby="reviews-label"
-          >
-            <h3 id="reviews-label" className="control-label">
-              Review preferences
-            </h3>
-            <p id="reviews-help" className="helper-copy">
-              Tell the future housing agent which signals to look for while
-              reading resident reviews.
-            </p>
-            <div className="textarea-field">
-              <Label htmlFor="review-wants">Want to see</Label>
-              <Textarea
-                id="review-wants"
-                value={reviewWants}
-                onChange={(event) => setReviewWants(event.target.value)}
-                placeholder="Responsive management, quiet at night, reliable maintenance…"
-                aria-describedby="reviews-help"
-              />
-            </div>
-            <div className="textarea-field">
-              <Label htmlFor="review-avoids">Want to avoid</Label>
-              <Textarea
-                id="review-avoids"
-                value={reviewAvoids}
-                onChange={(event) => setReviewAvoids(event.target.value)}
-                placeholder="Thin walls, surprise fees, pests…"
-                aria-describedby="reviews-help"
-              />
-            </div>
-          </section>
         </aside>
 
         <section className="workspace" aria-label="Housing results and map">
@@ -493,6 +457,10 @@ export function HousingExplorer() {
                 </div>
               )}
             </div>
+            <p className="disclosure">
+              Demo only · All listings, rents, and commute estimates are
+              fictional.
+            </p>
           </aside>
         </section>
 
@@ -579,17 +547,6 @@ export function HousingExplorer() {
                   Overview
                 </button>
                 <button
-                  id="building-tab-neighborhood"
-                  type="button"
-                  role="tab"
-                  aria-selected={detailTab === "neighborhood"}
-                  aria-controls="building-panel-neighborhood"
-                  tabIndex={detailTab === "neighborhood" ? 0 : -1}
-                  onClick={() => setDetailTab("neighborhood")}
-                >
-                  Neighborhood
-                </button>
-                <button
                   id="building-tab-reviews"
                   type="button"
                   role="tab"
@@ -599,6 +556,17 @@ export function HousingExplorer() {
                   onClick={() => setDetailTab("reviews")}
                 >
                   Reviews
+                </button>
+                <button
+                  id="building-tab-neighborhood"
+                  type="button"
+                  role="tab"
+                  aria-selected={detailTab === "neighborhood"}
+                  aria-controls="building-panel-neighborhood"
+                  tabIndex={detailTab === "neighborhood" ? 0 : -1}
+                  onClick={() => setDetailTab("neighborhood")}
+                >
+                  Neighborhood
                 </button>
               </div>
 
@@ -662,7 +630,7 @@ export function HousingExplorer() {
                         rel="noopener noreferrer"
                         aria-label="Apply for housing on the CHA Waitlist Application portal (opens in a new tab)"
                       >
-                        Apply for housing
+                        Apply for housing.
                         <ExternalLink aria-hidden="true" />
                       </a>
                     </aside>
