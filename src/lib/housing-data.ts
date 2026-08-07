@@ -15,7 +15,12 @@ export interface Home {
 export interface ModeConfig {
   label: string
   factor: number
-  monthlyCost: number
+  // Monthly travel cost is per listing, not per mode: a fixed part that every
+  // rider pays (a CTA pass, a downtown parking space) plus a part that scales
+  // with how long that particular listing's commute is. Costs assume ~21
+  // working days of round trips to the fixed destination.
+  baseMonthlyCost: number
+  monthlyCostPerCommuteMinute: number
 }
 
 export interface HomeResult extends Home {
@@ -33,10 +38,34 @@ export interface ExplorerResult {
 export const destination = "The Loop · 200 W Madison St"
 
 export const modes: Record<TravelMode, ModeConfig> = {
-  train: { label: "Train", factor: 1, monthlyCost: 75 },
-  walk: { label: "Walk", factor: 2.4, monthlyCost: 0 },
-  drive: { label: "Drive", factor: 0.78, monthlyCost: 310 },
-  rideshare: { label: "Rideshare", factor: 0.68, monthlyCost: 640 },
+  // A 30-day CTA pass covers the ride; longer trips add a feeder bus leg.
+  train: {
+    label: "Train",
+    factor: 1,
+    baseMonthlyCost: 75,
+    monthlyCostPerCommuteMinute: 0.7,
+  },
+  // Walking is free no matter how far it is.
+  walk: {
+    label: "Walk",
+    factor: 2.4,
+    baseMonthlyCost: 0,
+    monthlyCostPerCommuteMinute: 0,
+  },
+  // Downtown parking dominates; fuel and tolls scale with the drive.
+  drive: {
+    label: "Drive",
+    factor: 0.78,
+    baseMonthlyCost: 240,
+    monthlyCostPerCommuteMinute: 4,
+  },
+  // Almost entirely per-trip, so this scales hardest with distance.
+  rideshare: {
+    label: "Rideshare",
+    factor: 0.68,
+    baseMonthlyCost: 210,
+    monthlyCostPerCommuteMinute: 23,
+  },
 }
 
 export const homes: Home[] = [
@@ -206,13 +235,22 @@ export function commuteFor(home: Home, mode: TravelMode) {
   return Math.round(home.trainMinutes * modes[mode].factor)
 }
 
+// What this listing costs to commute from, per month. The destination is
+// fixed, so a listing's commute time stands in for its distance to it.
+export function monthlyCostFor(home: Home, mode: TravelMode) {
+  const { baseMonthlyCost, monthlyCostPerCommuteMinute } = modes[mode]
+  const cost =
+    baseMonthlyCost + monthlyCostPerCommuteMinute * commuteFor(home, mode)
+  return Math.round(cost / 5) * 5
+}
+
 function reachable(mode: TravelMode, maxMinutes: number): HomeResult[] {
   return homes
     .map((home) => ({
       ...home,
       mode,
       commute: commuteFor(home, mode),
-      monthlyCost: modes[mode].monthlyCost,
+      monthlyCost: monthlyCostFor(home, mode),
     }))
     .filter((home) => home.commute <= maxMinutes)
 }
