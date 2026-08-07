@@ -67,7 +67,7 @@ import {
 import type { HomeResult, Optimizer, TravelMode } from "@/lib/housing-data"
 import { getBuildingReviewData } from "@/lib/building-reviews"
 import { getNeighborhoodSnapshot } from "@/lib/neighborhood-data"
-import type { ShowMapInput } from "@/lib/agent/schemas"
+import type { RankedHousingMatch, ShowMapInput } from "@/lib/agent/schemas"
 import type {
   HousingDevelopment,
   ProfilePatch,
@@ -288,17 +288,10 @@ export function HousingExplorer({
     setIsDetailOpen(true)
   }
 
-  // Selecting a home (from a map marker or a list card) opens its detail
-  // inline in the Matches panel. Agent-driven matches don't have the demo
-  // review/neighborhood data that view is built around, so those just
-  // highlight on the map and in the list instead.
-  const handleHomeSelect = (id: string, trigger: HTMLElement) => {
-    if (isAgentDriven) {
-      setSelectedId(id)
-      return
-    }
-    openBuildingDetail(id, trigger)
-  }
+  // Selecting a home — from a map marker or a list card — opens its detail
+  // inline in the Matches panel. Agent matches render the agent detail
+  // (routes + rationale); demo homes render the review/neighborhood detail.
+  const handleHomeSelect = openBuildingDetail
 
   // The detail view renders inline in place of the Matches list, so closing it
   // just swaps the list back in and returns focus to the card that opened it.
@@ -324,6 +317,9 @@ export function HousingExplorer({
 
   const ActiveModeIcon = modeIcons[activeMode]
   const selectedHome = explorer.results.find((home) => home.id === selectedId)
+  const selectedAgentMatch = agentMatches.find(
+    (match) => match.housing.id === selectedId
+  )
   const mapHomes = useMemo<AppMapHome[]>(() => {
     if (isAgentDriven) {
       return agentMatches.map((match) => ({
@@ -944,10 +940,15 @@ export function HousingExplorer({
               className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background"
               aria-live="polite"
             >
-              {isDetailOpen &&
-              selectedHome &&
-              reviewData &&
-              neighborhoodData ? (
+              {isDetailOpen && selectedAgentMatch ? (
+                <AgentMatchDetailPanel
+                  match={selectedAgentMatch}
+                  onClose={closeBuildingDetail}
+                />
+              ) : isDetailOpen &&
+                selectedHome &&
+                reviewData &&
+                neighborhoodData ? (
                 <BuildingDetailPanel
                   home={selectedHome}
                   reviewData={reviewData}
@@ -1585,6 +1586,163 @@ function BuildingDetailPanel({
             </div>
           </div>
         )}
+      </div>
+    </section>
+  )
+}
+
+// Inline detail for an agent-produced match. Agent matches carry routes and a
+// plain-language rationale rather than the demo review/neighborhood data, so
+// this shows those instead of the tabbed BuildingDetailPanel.
+function AgentMatchDetailPanel({
+  match,
+  onClose,
+}: {
+  match: RankedHousingMatch
+  onClose: () => void
+}) {
+  const { housing } = match
+  return (
+    <section
+      className="flex h-full min-h-0 flex-col overflow-hidden bg-background"
+      aria-labelledby="agent-detail-title"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault()
+          onClose()
+        }
+      }}
+    >
+      <header className="flex min-h-16 shrink-0 items-start justify-between gap-3 border-b px-4 py-3">
+        <div className="min-w-0">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="-ml-2 h-7 gap-1 px-2 text-xs"
+            onClick={onClose}
+            aria-label="Back to matches list"
+          >
+            <ChevronLeft className="size-3" /> Matches
+          </Button>
+          <h2
+            id="agent-detail-title"
+            className="mt-1 truncate text-lg font-medium tracking-tight"
+          >
+            {housing.propertyName}
+          </h2>
+          <p className="mt-0.5 truncate text-sm text-muted-foreground">
+            {housing.communityArea
+              ? `${housing.address} · ${housing.communityArea}`
+              : housing.address}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Badge variant="outline">
+            {match.rentUsd ? `$${match.rentUsd.toLocaleString()}/mo` : "Ask"}
+          </Badge>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            aria-label={`Close details for ${housing.propertyName}`}
+          >
+            <X />
+          </Button>
+        </div>
+      </header>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+        <dl className="grid grid-cols-2 divide-x divide-y overflow-hidden rounded-xl border">
+          <div className="p-4">
+            <dt className="text-xs text-muted-foreground">Monthly rent</dt>
+            <dd className="mt-1 text-sm font-medium">
+              {match.rentUsd ? `$${match.rentUsd.toLocaleString()}` : "Ask"}
+            </dd>
+          </div>
+          <div className="p-4">
+            <dt className="text-xs text-muted-foreground">Floor plan</dt>
+            <dd className="mt-1 text-sm font-medium">
+              {match.bedrooms === undefined
+                ? "Ask"
+                : match.bedrooms === 0
+                  ? "Studio"
+                  : `${match.bedrooms} bed`}
+            </dd>
+          </div>
+        </dl>
+
+        {match.routes.length > 0 && (
+          <section aria-labelledby="agent-routes-heading">
+            <h3
+              id="agent-routes-heading"
+              className="mb-2 text-xs font-medium tracking-widest text-muted-foreground uppercase"
+            >
+              Commute &amp; nearby
+            </h3>
+            <ul className="grid gap-2">
+              {match.routes.map((route, index) => (
+                <li
+                  key={`${route.destinationId}-${route.mode}-${index}`}
+                  className="flex items-center gap-3 rounded-xl border p-3 text-sm"
+                >
+                  <span
+                    className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground"
+                    aria-hidden="true"
+                  >
+                    <Clock3 className="size-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="font-medium">
+                      {route.durationMinutes} min by {route.mode}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      to {route.destinationLabel ?? route.purpose}
+                      {route.estimate ? " · estimated" : ""}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <section aria-labelledby="agent-rationale-heading">
+          <h3
+            id="agent-rationale-heading"
+            className="mb-2 text-xs font-medium tracking-widest text-muted-foreground uppercase"
+          >
+            Why this match
+          </h3>
+          <AgentMarkdown>{match.rationale}</AgentMarkdown>
+        </section>
+
+        <aside className="flex flex-col items-stretch gap-4 rounded-xl border bg-muted p-4">
+          <div>
+            <h3 className="text-sm font-medium">
+              Interested in affordable housing?
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              The official CHA portal supports applications for Public Housing,
+              Project-Based Voucher, and Project-Based Rental Assistance
+              waitlists. Eligibility and waitlist availability vary.
+            </p>
+          </div>
+          <Button
+            render={
+              <a
+                href="https://applyonline.thecha.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+              />
+            }
+            aria-label="Apply for housing on the CHA Waitlist Application portal (opens in a new tab)"
+          >
+            Apply for housing
+            <ExternalLink data-icon="inline-end" aria-hidden="true" />
+          </Button>
+        </aside>
       </div>
     </section>
   )
