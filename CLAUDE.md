@@ -9,3 +9,7 @@ Use the shadcn theme configured in `components.json` and `src/styles.css` as the
 ## Maps
 
 Build map experiences with MapCN. Use its components and APIs instead of integrating with MapLibre GL directly.
+
+## Tests
+
+`pnpm test` runs the tests in `src/lib/agent/`. Run it only when a change touches that directory; do not run tests for other changes.

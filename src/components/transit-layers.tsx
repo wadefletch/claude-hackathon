@@ -1,6 +1,10 @@
 import { useEffect } from "react"
 
 import { useMap } from "@/components/ui/map"
+import {
+  dataSourceMarkerImageId,
+  registerDataSourceMarkerIcons,
+} from "@/lib/map-data-source-icons"
 
 const TRANSIT_SOURCE_IDS = [
   "cta-bus-routes",
@@ -14,7 +18,7 @@ const TRANSIT_LAYER_IDS = [
   "cta-rail-lines-casing",
   "cta-rail-lines-line",
   "cta-bus-stops-circle",
-  "cta-rail-stations-circle",
+  "cta-rail-stations-symbol",
 ] as const
 
 const CTA_ATTRIBUTION =
@@ -65,6 +69,7 @@ export function TransitLayers() {
 
   useEffect(() => {
     if (!map || !isLoaded) return
+    let cancelled = false
 
     // Keep transit above every basemap geometry layer, including buildings,
     // while preserving basemap labels above the overlay.
@@ -183,23 +188,36 @@ export function TransitLayers() {
       firstLabelLayer
     )
 
-    map.addLayer(
-      {
-        id: "cta-rail-stations-circle",
-        type: "circle",
-        source: "cta-rail-stations",
-        minzoom: 9,
-        paint: {
-          "circle-color": "#ffffff",
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 3, 14, 5],
-          "circle-stroke-color": "#171717",
-          "circle-stroke-width": 1.5,
+    void registerDataSourceMarkerIcons(map, ["railStation"]).then(() => {
+      if (cancelled) return
+
+      map.addLayer(
+        {
+          id: "cta-rail-stations-symbol",
+          type: "symbol",
+          source: "cta-rail-stations",
+          minzoom: 9,
+          layout: {
+            "icon-image": dataSourceMarkerImageId("railStation"),
+            "icon-size": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              9,
+              0.7,
+              14,
+              0.96,
+            ],
+            "icon-allow-overlap": false,
+            "icon-padding": 2,
+          },
         },
-      },
-      firstLabelLayer
-    )
+        firstLabelLayer
+      )
+    })
 
     return () => {
+      cancelled = true
       for (const layerId of [...TRANSIT_LAYER_IDS].reverse()) {
         if (map.getLayer(layerId)) map.removeLayer(layerId)
       }
