@@ -15,12 +15,12 @@ export const Route = createRootRoute({
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "ChiRoute · Chicago Affordable Housing Commute Explorer",
+        title: "Qualifind · Chicago Affordable Housing Search",
       },
       {
         name: "description",
         content:
-          "Explore affordable Chicago homes by commute time, travel mode, rent, and monthly transportation cost.",
+          "Find affordable Chicago homes that fit your commute, travel costs, and housing needs.",
       },
       {
         name: "theme-color",
