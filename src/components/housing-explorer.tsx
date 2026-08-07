@@ -128,6 +128,7 @@ export function HousingExplorer() {
   const detailDialogRef = useRef<HTMLDialogElement>(null)
   const detailTriggerRef = useRef<HTMLElement | null>(null)
   const {
+    error: chatError,
     messages: chatMessages,
     sendMessage: sendChatMessage,
     status: chatStatus,
@@ -673,6 +674,20 @@ export function HousingExplorer() {
                               </Message>
                             </MessageScrollerItem>
                           ))}
+                          {chatError && (
+                            <MessageScrollerItem messageId="agent-error">
+                              <Message>
+                                <MessageContent>
+                                  <Bubble variant="destructive">
+                                    <BubbleContent role="alert">
+                                      I couldn&apos;t finish that response.
+                                      Please try again.
+                                    </BubbleContent>
+                                  </Bubble>
+                                </MessageContent>
+                              </Message>
+                            </MessageScrollerItem>
+                          )}
                         </MessageScrollerContent>
                       </MessageScrollerViewport>
                       <MessageScrollerButton />
