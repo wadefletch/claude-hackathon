@@ -26,8 +26,8 @@ import { useGeoapifyIsochrone } from "@/hooks/use-geoapify-isochrone"
 import type { IsochroneMode } from "@/hooks/use-geoapify-isochrone"
 import { interpolateIsochrone } from "@/lib/isochrone-animation"
 import {
-  pendingIsochronePatternId,
-  registerPendingIsochronePattern,
+  pendingIsochronePatternExpression,
+  registerPendingIsochronePatterns,
 } from "@/lib/isochrone-pattern"
 import { cn } from "@/lib/utils"
 
@@ -309,12 +309,12 @@ function AnimatedIsochroneLayer({
   const [animatedData, setAnimatedData] = useState(data)
   const animatedDataRef = useRef(data)
   const [patternReady, setPatternReady] = useState(false)
-  const patternId = pendingIsochronePatternId(resolvedTheme)
+  const pattern = pendingIsochronePatternExpression(resolvedTheme)
 
   useEffect(() => {
     if (!map || !isLoaded) return
 
-    setPatternReady(registerPendingIsochronePattern(map, resolvedTheme))
+    setPatternReady(registerPendingIsochronePatterns(map, resolvedTheme))
   }, [isLoaded, map, resolvedTheme])
 
   useEffect(() => {
@@ -406,7 +406,7 @@ function AnimatedIsochroneLayer({
           id="travel-time-isochrone-pending"
           data={animatedData}
           fillPaint={{
-            "fill-pattern": patternId,
+            "fill-pattern": pattern,
             "fill-opacity": PENDING_ISOCHRONE_MIN_OPACITY,
           }}
           linePaint={false}
