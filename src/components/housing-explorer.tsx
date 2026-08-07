@@ -1218,6 +1218,7 @@ export function HousingExplorer() {
               className="min-h-16 resize-none"
               value={chatInput}
               onChange={(event) => setChatInput(event.target.value)}
+              placeholder="Message the housing agent"
               rows={2}
               disabled={chatStatus === "streaming"}
             />
