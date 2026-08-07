@@ -612,6 +612,7 @@
 
   .filter-rail,
   .agent-panel {
+    height: 760px;
     min-width: 0;
     overflow: hidden;
     border: 1px solid rgb(25 63 46 / 0.12);
@@ -665,7 +666,7 @@
   .result-card { flex: 0 0 clamp(280px, 34vw, 340px); scroll-snap-align: start; }
   .empty-state { width: 100%; min-height: 220px; }
 
-  .agent-panel { display: flex; height: 760px; flex-direction: column; position: sticky; top: 1rem; }
+  .agent-panel { display: flex; flex-direction: column; position: sticky; top: 1rem; }
   .agent-header { display: flex; align-items: center; gap: 0.65rem; padding: 1rem; border-bottom: 1px solid rgb(28 66 49 / 0.1); }
   .agent-avatar, .message-avatar { display: grid; flex: 0 0 auto; place-items: center; border-radius: 50%; background: #214e38; color: white; }
   .agent-avatar { width: 2.4rem; height: 2.4rem; }
@@ -713,7 +714,7 @@
   .hero { padding-top: 1.4rem; }
   .hero h1 { font-size: 2.35rem; }
   .app-layout { grid-template-columns: 1fr; padding-inline: 0.75rem; }
-  .filter-rail { width: 100%; }
+  .filter-rail { width: 100%; height: auto; }
   .agent-panel { grid-column: auto; height: 480px; }
   .chat-thread { display: flex; }
   .workspace { padding-inline: 0; }
