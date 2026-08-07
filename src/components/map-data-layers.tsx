@@ -1,11 +1,42 @@
 import { createElement, useEffect, useId } from "react"
 import type { ComponentType } from "react"
 import type { MapLayerMouseEvent } from "maplibre-gl"
-import { BusFront, ShoppingBasket } from "lucide-react"
+import {
+  Bike,
+  BusFront,
+  Layers3,
+  Library,
+  Map as MapIcon,
+  Route,
+  School,
+  Shapes,
+  ShoppingBasket,
+  Trees,
+  TriangleAlert,
+} from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
+import {
+  BikeRoutesDataLayer,
+  BuildingViolationsDataLayer,
+  CommunityAreasDataLayer,
+  DivvyStationsDataLayer,
+  LibrariesDataLayer,
+  ParksDataLayer,
+  SchoolBoundariesDataLayer,
+  SchoolsDataLayer,
+} from "@/components/chicago-data-layers"
 import { TransitLayers } from "@/components/transit-layers"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useMap } from "@/components/ui/map"
 import {
   dataSourceMarkerImageId,
@@ -28,6 +59,7 @@ type MapDataLayerDefinition = {
   label: string
   description: string
   icon: LucideIcon
+  group: "essentials" | "mobility" | "context"
   defaultVisible: boolean
   component: ComponentType<MapDataLayerComponentProps>
 }
@@ -46,6 +78,7 @@ export const MAP_DATA_LAYERS = [
     label: "Transit",
     description: "CTA train lines, stations, bus routes, and stops",
     icon: BusFront,
+    group: "mobility",
     defaultVisible: false,
     component: TransitDataLayer,
   },
@@ -54,8 +87,83 @@ export const MAP_DATA_LAYERS = [
     label: "Groceries",
     description: "Full-service grocery stores and their operating status",
     icon: ShoppingBasket,
+    group: "essentials",
     defaultVisible: true,
     component: GroceryStoresDataLayer,
+  },
+  {
+    id: "parks",
+    label: "Parks",
+    description: "Chicago Park District boundaries and amenities",
+    icon: Trees,
+    group: "essentials",
+    defaultVisible: false,
+    component: ParksDataLayer,
+  },
+  {
+    id: "schools",
+    label: "Schools",
+    description: "Chicago Public School locations for school year 2025–26",
+    icon: School,
+    group: "essentials",
+    defaultVisible: false,
+    component: SchoolsDataLayer,
+  },
+  {
+    id: "libraries",
+    label: "Libraries",
+    description: "Chicago Public Library locations, hours, and contact details",
+    icon: Library,
+    group: "essentials",
+    defaultVisible: false,
+    component: LibrariesDataLayer,
+  },
+  {
+    id: "divvy-stations",
+    label: "Divvy",
+    description: "In-service Divvy bicycle stations",
+    icon: Bike,
+    group: "mobility",
+    defaultVisible: false,
+    component: DivvyStationsDataLayer,
+  },
+  {
+    id: "bike-routes",
+    label: "Bike routes",
+    description: "Chicago bicycle routes and facility types",
+    icon: Route,
+    group: "mobility",
+    defaultVisible: false,
+    component: BikeRoutesDataLayer,
+  },
+  {
+    id: "school-boundaries",
+    label: "School zones",
+    description:
+      "Current elementary, middle, and high school attendance boundaries",
+    icon: Shapes,
+    group: "context",
+    defaultVisible: false,
+    component: SchoolBoundariesDataLayer,
+  },
+  {
+    id: "community-areas",
+    label: "Community areas",
+    description: "Official Chicago community area boundaries",
+    icon: MapIcon,
+    group: "context",
+    defaultVisible: false,
+    component: CommunityAreasDataLayer,
+  },
+  {
+    id: "building-violations",
+    label: "Building violations",
+    description:
+      "Open building violations in the visible area; zoom in to view",
+    icon: TriangleAlert,
+    group: "context",
+    defaultVisible: false,
+    component: BuildingViolationsDataLayer,
   },
 ] as const satisfies readonly MapDataLayerDefinition[]
 
@@ -65,10 +173,6 @@ export const DEFAULT_VISIBLE_MAP_DATA_LAYER_IDS: MapDataLayerId[] =
   MAP_DATA_LAYERS.filter((layer) => layer.defaultVisible).map(
     (layer) => layer.id
   )
-
-function isMapDataLayerId(layerId: string): layerId is MapDataLayerId {
-  return MAP_DATA_LAYERS.some((layer) => layer.id === layerId)
-}
 
 export function MapDataLayers({
   visibleLayerIds,
@@ -97,36 +201,62 @@ export function MapDataLayerControls({
   onVisibleLayerIdsChange: (layerIds: MapDataLayerId[]) => void
 }) {
   const visibleLayers = new Set(visibleLayerIds)
+  const setLayerVisibility = (layerId: MapDataLayerId, visible: boolean) => {
+    onVisibleLayerIdsChange(
+      visible
+        ? [...new Set([...visibleLayerIds, layerId])]
+        : visibleLayerIds.filter((visibleLayerId) => visibleLayerId !== layerId)
+    )
+  }
 
   return (
-    <ToggleGroup
-      variant="outline"
-      size="sm"
-      spacing={1}
-      multiple
-      value={visibleLayerIds}
-      onValueChange={(layerIds) =>
-        onVisibleLayerIdsChange(layerIds.filter(isMapDataLayerId))
-      }
-      aria-label="Map data layers"
-      className="absolute top-2 left-2 z-10 flex-wrap bg-background shadow-sm"
-    >
-      {MAP_DATA_LAYERS.map((layer) => {
-        const Icon = layer.icon
-        return (
-          <ToggleGroupItem
-            key={layer.id}
-            value={layer.id}
-            aria-label={`${visibleLayers.has(layer.id) ? "Hide" : "Show"} ${layer.description}`}
-          >
-            <Icon data-icon="inline-start" />
-            {layer.label}
-          </ToggleGroupItem>
-        )
-      })}
-    </ToggleGroup>
+    <div className="absolute top-2 left-2 z-10">
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={<Button variant="outline" size="sm" className="shadow-sm" />}
+        >
+          <Layers3 data-icon="inline-start" />
+          Layers ({visibleLayerIds.length})
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="min-w-64">
+          {MAP_DATA_LAYER_GROUPS.map((group, groupIndex) => (
+            <div key={group.id}>
+              {groupIndex > 0 && <DropdownMenuSeparator />}
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                {MAP_DATA_LAYERS.filter(
+                  (layer) => layer.group === group.id
+                ).map((layer) => {
+                  const Icon = layer.icon
+                  const checked = visibleLayers.has(layer.id)
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={layer.id}
+                      checked={checked}
+                      onCheckedChange={(nextChecked) =>
+                        setLayerVisibility(layer.id, nextChecked === true)
+                      }
+                      aria-label={`${checked ? "Hide" : "Show"} ${layer.description}`}
+                    >
+                      <Icon />
+                      {layer.label}
+                    </DropdownMenuCheckboxItem>
+                  )
+                })}
+              </DropdownMenuGroup>
+            </div>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   )
 }
+
+const MAP_DATA_LAYER_GROUPS = [
+  { id: "essentials", label: "Everyday essentials" },
+  { id: "mobility", label: "Transportation" },
+  { id: "context", label: "Area and property context" },
+] as const
 
 type GroceryStoreProperties = {
   store_name?: string

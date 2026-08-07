@@ -1,6 +1,13 @@
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
-import { ShoppingBasket, TrainFront } from "lucide-react"
+import {
+  Bike,
+  Library,
+  School,
+  ShoppingBasket,
+  TrainFront,
+  TriangleAlert,
+} from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type { Map as MapLibreMap } from "maplibre-gl"
 
@@ -47,6 +54,38 @@ export const DATA_SOURCE_MARKER_ICONS = {
     label: "Train station",
     shape: "circle",
     background: "--foreground",
+    foreground: "--background",
+    border: "--background",
+  },
+  school: {
+    icon: School,
+    label: "Chicago Public School",
+    shape: "rounded-square",
+    background: "--primary",
+    foreground: "--primary-foreground",
+    border: "--background",
+  },
+  library: {
+    icon: Library,
+    label: "Chicago Public Library",
+    shape: "rounded-square",
+    background: "--success",
+    foreground: "--success-foreground",
+    border: "--background",
+  },
+  divvyStation: {
+    icon: Bike,
+    label: "Divvy station",
+    shape: "circle",
+    background: "--foreground",
+    foreground: "--background",
+    border: "--background",
+  },
+  buildingViolation: {
+    icon: TriangleAlert,
+    label: "Open building violation",
+    shape: "rounded-square",
+    background: "--destructive",
     foreground: "--background",
     border: "--background",
   },
