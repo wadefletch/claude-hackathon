@@ -45,12 +45,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupTextarea,
-} from "@/components/ui/input-group"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Message, MessageContent, MessageFooter } from "@/components/ui/message"
@@ -987,7 +981,7 @@ export function HousingExplorer({
                   </MessageScrollerProvider>
 
                   <form
-                    className="shrink-0 p-3"
+                    className="flex shrink-0 items-center gap-2 p-3"
                     onSubmit={(event) => {
                       event.preventDefault()
                       submitChatMessage()
@@ -996,37 +990,21 @@ export function HousingExplorer({
                     <Label htmlFor="agent-message" className="sr-only">
                       Message the housing agent
                     </Label>
-                    <InputGroup>
-                      <InputGroupTextarea
-                        id="agent-message"
-                        className="min-h-16"
-                        value={chatInput}
-                        onChange={(event) => setChatInput(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" && !event.shiftKey) {
-                            event.preventDefault()
-                            submitChatMessage()
-                          }
-                        }}
-                        placeholder="Message the housing agent"
-                        rows={2}
-                        disabled={isChatBusy}
-                      />
-                      <InputGroupAddon
-                        align="block-end"
-                        className="justify-end"
-                      >
-                        <InputGroupButton
-                          type="submit"
-                          variant="default"
-                          size="icon-sm"
-                          disabled={isChatBusy || !chatInput.trim()}
-                          aria-label="Send message"
-                        >
-                          <Send />
-                        </InputGroupButton>
-                      </InputGroupAddon>
-                    </InputGroup>
+                    <Input
+                      id="agent-message"
+                      value={chatInput}
+                      onChange={(event) => setChatInput(event.target.value)}
+                      placeholder="Message the housing agent"
+                      disabled={isChatBusy}
+                    />
+                    <Button
+                      type="submit"
+                      size="icon"
+                      disabled={isChatBusy || !chatInput.trim()}
+                      aria-label="Send message"
+                    >
+                      <Send />
+                    </Button>
                   </form>
                 </TabsContent>
               </Tabs>
