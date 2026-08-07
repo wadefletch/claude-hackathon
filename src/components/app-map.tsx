@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import type { FeatureCollection, Geometry } from "geojson"
 import { Building2, Sparkles } from "lucide-react"
 
 import {
@@ -23,6 +24,7 @@ import {
 import { HandGestureMapControls } from "@/components/hand-gesture-map-controls"
 import { useGeoapifyIsochrone } from "@/hooks/use-geoapify-isochrone"
 import type { IsochroneMode } from "@/hooks/use-geoapify-isochrone"
+import { interpolateIsochrone } from "@/lib/isochrone-animation"
 import { cn } from "@/lib/utils"
 
 export type AppMapLocation = {
@@ -55,6 +57,11 @@ export type AppMapProps = {
   className?: string
 }
 
+type IsochroneData = FeatureCollection<Geometry>
+
+const ISOCHRONE_TRANSITION_DURATION = 350
+const STALE_ISOCHRONE_COLOR = "#737373"
+
 export function AppMap({ state, onHomeSelect, className }: AppMapProps) {
   const { homes, work, selectedHomeId, winnerId, isochrone } = state
   const [visibleLayerIds, setVisibleLayerIds] = useState<MapDataLayerId[]>(
@@ -63,7 +70,7 @@ export function AppMap({ state, onHomeSelect, className }: AppMapProps) {
   const [selectedDataLayerFeature, setSelectedDataLayerFeature] =
     useState<MapDataLayerFeature | null>(null)
   const isochroneOrigin = isochrone?.origin ?? work
-  const { data: isochroneData, isFetching: isIsochroneLoading } =
+  const { data: isochroneData, isPlaceholderData: isIsochroneStale } =
     useGeoapifyIsochrone(
       isochrone
         ? {
@@ -94,7 +101,7 @@ export function AppMap({ state, onHomeSelect, className }: AppMapProps) {
       )}
       aria-label={`Map of homes near ${work.label}`}
     >
-      <Map loading={isIsochroneLoading}>
+      <Map>
         <MapControls showCompass showFullscreen />
         <HandGestureMapControls />
         <MapDataLayerControls
@@ -105,18 +112,11 @@ export function AppMap({ state, onHomeSelect, className }: AppMapProps) {
           visibleLayerIds={visibleLayerIds}
           onFeatureSelect={setSelectedDataLayerFeature}
         />
-        {isochroneData && (
-          <MapGeoJSON
-            id="travel-time-isochrone"
+        {isochrone && isochroneData && (
+          <AnimatedIsochroneLayer
             data={isochroneData}
-            fillPaint={{
-              "fill-color": isochroneColor,
-              "fill-opacity": 0.2,
-            }}
-            linePaint={{
-              "line-color": isochroneColor,
-              "line-width": 2,
-            }}
+            color={isochroneColor}
+            isStale={isIsochroneStale}
           />
         )}
         {homes.map((home) => (
@@ -143,6 +143,68 @@ export function AppMap({ state, onHomeSelect, className }: AppMapProps) {
         />
       </Map>
     </section>
+  )
+}
+
+function AnimatedIsochroneLayer({
+  data,
+  color,
+  isStale,
+}: {
+  data: IsochroneData
+  color: string
+  isStale: boolean
+}) {
+  const [animatedData, setAnimatedData] = useState(data)
+  const animatedDataRef = useRef(data)
+
+  useEffect(() => {
+    if (data === animatedDataRef.current) return
+
+    const from = animatedDataRef.current
+    const startedAt = performance.now()
+    let animationFrame = 0
+
+    const animate = (now: number) => {
+      const progress = Math.min(
+        (now - startedAt) / ISOCHRONE_TRANSITION_DURATION,
+        1
+      )
+      const easedProgress = 1 - Math.pow(1 - progress, 3)
+      const nextData = interpolateIsochrone(from, data, easedProgress)
+
+      animatedDataRef.current = nextData
+      setAnimatedData(nextData)
+
+      if (progress < 1) {
+        animationFrame = window.requestAnimationFrame(animate)
+      } else {
+        animatedDataRef.current = data
+        setAnimatedData(data)
+      }
+    }
+
+    animationFrame = window.requestAnimationFrame(animate)
+    return () => window.cancelAnimationFrame(animationFrame)
+  }, [data])
+
+  const layerColor = isStale ? STALE_ISOCHRONE_COLOR : color
+
+  return (
+    <MapGeoJSON
+      id="travel-time-isochrone"
+      data={animatedData}
+      fillPaint={{
+        "fill-color": layerColor,
+        "fill-color-transition": { duration: 200 },
+        "fill-opacity": 0.2,
+      }}
+      linePaint={{
+        "line-color": layerColor,
+        "line-color-transition": { duration: 200 },
+        "line-width": 2,
+      }}
+    />
   )
 }
 

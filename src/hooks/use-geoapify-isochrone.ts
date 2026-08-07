@@ -1,6 +1,11 @@
 import { useQuery } from "@tanstack/react-query"
 import type { FeatureCollection, Geometry } from "geojson"
 
+import {
+  readCachedIsochrone,
+  writeCachedIsochrone,
+} from "@/lib/isochrone-cache"
+
 export type IsochroneMode = "drive" | "transit"
 
 type IsochroneQuery = {
@@ -25,19 +30,34 @@ export function useGeoapifyIsochrone(query?: IsochroneQuery) {
       query?.mode,
       query?.minutes,
     ],
-    queryFn: ({ signal }) => {
+    queryFn: async ({ signal }) => {
       if (!query || !GEOAPIFY_API_KEY) {
         throw new Error("Geoapify isochrone query is not configured")
       }
 
-      return fetchIsochrone(query, GEOAPIFY_API_KEY, signal)
+      const storage = getLocalStorage()
+      const cached = storage && readCachedIsochrone(storage, query)
+      if (cached) return cached
+
+      const data = await fetchIsochrone(query, GEOAPIFY_API_KEY, signal)
+      if (storage) writeCachedIsochrone(storage, query, data)
+      return data
     },
     enabled:
       typeof window !== "undefined" &&
       Boolean(query?.minutes && GEOAPIFY_API_KEY),
+    placeholderData: (previousData) => previousData,
     staleTime: Infinity,
     retry: false,
   })
+}
+
+function getLocalStorage(): Storage | null {
+  try {
+    return window.localStorage
+  } catch {
+    return null
+  }
 }
 
 async function fetchIsochrone(
