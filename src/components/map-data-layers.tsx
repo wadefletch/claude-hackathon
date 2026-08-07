@@ -1,9 +1,30 @@
 import { createElement, useEffect, useId } from "react"
 import type { ComponentType } from "react"
 import type { MapLayerMouseEvent } from "maplibre-gl"
-import { BusFront, ShoppingBasket } from "lucide-react"
+import {
+  Bike,
+  BusFront,
+  Library,
+  Map as MapIcon,
+  Route,
+  School,
+  Shapes,
+  ShoppingBasket,
+  Trees,
+  TriangleAlert,
+} from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
+import {
+  BikeRoutesDataLayer,
+  BuildingViolationsDataLayer,
+  CommunityAreasDataLayer,
+  DivvyStationsDataLayer,
+  LibrariesDataLayer,
+  ParksDataLayer,
+  SchoolBoundariesDataLayer,
+  SchoolsDataLayer,
+} from "@/components/chicago-data-layers"
 import { TransitLayers } from "@/components/transit-layers"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -39,6 +60,7 @@ type MapDataLayerDefinition = {
   label: string
   description: string
   icon: LucideIcon
+  group: "essentials" | "mobility" | "context"
   defaultVisible: boolean
   placement: MapLayerPlacement
   component: ComponentType<MapDataLayerComponentProps>
@@ -58,6 +80,7 @@ export const MAP_DATA_LAYERS = [
     label: "Transit",
     description: "CTA train lines, stations, bus routes, and stops",
     icon: BusFront,
+    group: "mobility",
     defaultVisible: false,
     placement: "transit",
     component: TransitDataLayer,
@@ -67,9 +90,92 @@ export const MAP_DATA_LAYERS = [
     label: "Groceries",
     description: "Full-service grocery stores and their operating status",
     icon: ShoppingBasket,
+    group: "essentials",
     defaultVisible: true,
     placement: "foreground",
     component: GroceryStoresDataLayer,
+  },
+  {
+    id: "parks",
+    label: "Parks",
+    description: "Chicago Park District boundaries and amenities",
+    icon: Trees,
+    group: "essentials",
+    defaultVisible: false,
+    placement: "coverage",
+    component: ParksDataLayer,
+  },
+  {
+    id: "schools",
+    label: "Schools",
+    description: "Chicago Public School locations for school year 2025–26",
+    icon: School,
+    group: "essentials",
+    defaultVisible: false,
+    placement: "foreground",
+    component: SchoolsDataLayer,
+  },
+  {
+    id: "libraries",
+    label: "Libraries",
+    description: "Chicago Public Library locations, hours, and contact details",
+    icon: Library,
+    group: "essentials",
+    defaultVisible: false,
+    placement: "foreground",
+    component: LibrariesDataLayer,
+  },
+  {
+    id: "divvy-stations",
+    label: "Divvy",
+    description: "In-service Divvy bicycle stations",
+    icon: Bike,
+    group: "mobility",
+    defaultVisible: false,
+    placement: "foreground",
+    component: DivvyStationsDataLayer,
+  },
+  {
+    id: "bike-routes",
+    label: "Bike routes",
+    description: "Chicago bicycle routes and facility types",
+    icon: Route,
+    group: "mobility",
+    defaultVisible: false,
+    placement: "transit",
+    component: BikeRoutesDataLayer,
+  },
+  {
+    id: "school-boundaries",
+    label: "School zones",
+    description:
+      "Current elementary, middle, and high school attendance boundaries",
+    icon: Shapes,
+    group: "context",
+    defaultVisible: false,
+    placement: "coverage",
+    component: SchoolBoundariesDataLayer,
+  },
+  {
+    id: "community-areas",
+    label: "Community areas",
+    description: "Official Chicago community area boundaries",
+    icon: MapIcon,
+    group: "context",
+    defaultVisible: false,
+    placement: "coverage",
+    component: CommunityAreasDataLayer,
+  },
+  {
+    id: "building-violations",
+    label: "Building violations",
+    description:
+      "Open building violations in the visible area; zoom in to view",
+    icon: TriangleAlert,
+    group: "context",
+    defaultVisible: false,
+    placement: "foreground",
+    component: BuildingViolationsDataLayer,
   },
 ] as const satisfies readonly MapDataLayerDefinition[]
 
@@ -109,51 +215,66 @@ export function MapDataLayerControls({
 }) {
   const controlId = useId()
   const visibleLayers = new Set(visibleLayerIds)
-
   const setLayerVisibility = (layerId: MapDataLayerId, visible: boolean) => {
-    const nextVisibleLayerIds = visible
-      ? [...visibleLayerIds, layerId]
-      : visibleLayerIds.filter((visibleLayerId) => visibleLayerId !== layerId)
-
-    onVisibleLayerIdsChange(nextVisibleLayerIds)
+    onVisibleLayerIdsChange(
+      visible
+        ? [...new Set([...visibleLayerIds, layerId])]
+        : visibleLayerIds.filter((visibleLayerId) => visibleLayerId !== layerId)
+    )
   }
 
   return (
-    <Card size="sm" className="absolute top-2 left-2 z-10 min-w-40 shadow-sm">
+    <Card size="sm" className="absolute top-2 left-2 z-10 w-56 shadow-sm">
       <CardHeader>
         <CardTitle>Map layers</CardTitle>
       </CardHeader>
-      <CardContent>
-        <FieldSet>
-          <FieldLegend className="sr-only">Map layers</FieldLegend>
-          <FieldGroup className="gap-2">
-            {MAP_DATA_LAYERS.map((layer) => {
-              const Icon = layer.icon
-              const switchId = `${controlId}-${layer.id}`
+      <CardContent className="max-h-64 overflow-y-auto">
+        <FieldGroup className="gap-3">
+          {MAP_DATA_LAYER_GROUPS.map((group) => (
+            <FieldSet key={group.id} className="gap-2">
+              <FieldLegend variant="label">{group.label}</FieldLegend>
+              <FieldGroup className="gap-2">
+                {MAP_DATA_LAYERS.filter(
+                  (layer) => layer.group === group.id
+                ).map((layer) => {
+                  const Icon = layer.icon
+                  const switchId = `${controlId}-${layer.id}`
 
-              return (
-                <Field key={layer.id} orientation="horizontal">
-                  <FieldLabel htmlFor={switchId} title={layer.description}>
-                    <Icon data-icon="inline-start" />
-                    {layer.label}
-                  </FieldLabel>
-                  <Switch
-                    id={switchId}
-                    size="sm"
-                    checked={visibleLayers.has(layer.id)}
-                    onCheckedChange={(checked) =>
-                      setLayerVisibility(layer.id, checked)
-                    }
-                  />
-                </Field>
-              )
-            })}
-          </FieldGroup>
-        </FieldSet>
+                  return (
+                    <Field key={layer.id} orientation="horizontal">
+                      <FieldLabel
+                        htmlFor={switchId}
+                        title={layer.description}
+                        className="font-normal"
+                      >
+                        <Icon data-icon="inline-start" size={16} />
+                        {layer.label}
+                      </FieldLabel>
+                      <Switch
+                        id={switchId}
+                        size="sm"
+                        checked={visibleLayers.has(layer.id)}
+                        onCheckedChange={(checked) =>
+                          setLayerVisibility(layer.id, checked)
+                        }
+                      />
+                    </Field>
+                  )
+                })}
+              </FieldGroup>
+            </FieldSet>
+          ))}
+        </FieldGroup>
       </CardContent>
     </Card>
   )
 }
+
+const MAP_DATA_LAYER_GROUPS = [
+  { id: "essentials", label: "Everyday essentials" },
+  { id: "mobility", label: "Transportation" },
+  { id: "context", label: "Area and property context" },
+] as const
 
 type GroceryStoreProperties = {
   store_name?: string
