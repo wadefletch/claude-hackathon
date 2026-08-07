@@ -42,6 +42,12 @@ export interface ExplorerResult {
 
 export const destination = "The Loop · 200 W Madison St"
 
+export const MIN_RENT = 800
+// Real feed rents run 800 + (h % 12) * 75 (see mockHousingDetail in
+// src/domain/detail.ts), i.e. up to $1,625, so the ceiling brackets that
+// range and the default doesn't silently hide the priciest listings.
+export const MAX_RENT = 1700
+
 export const modes: Record<TravelMode, ModeConfig> = {
   // A 30-day CTA pass covers the ride; longer trips add a feeder bus leg.
   train: {
@@ -250,10 +256,12 @@ export function monthlyCostFor(home: Home, mode: TravelMode) {
 }
 
 // `homeList` defaults to the built-in fixtures so existing callers/tests keep
-// their 2-arg signature; the live explorer passes real developments instead.
+// their old arity; the live explorer passes real developments and a rent
+// ceiling instead.
 function reachable(
   mode: TravelMode,
   maxMinutes: number,
+  maxRent: number,
   homeList: Home[] = homes
 ): HomeResult[] {
   return homeList
@@ -263,15 +271,16 @@ function reachable(
       commute: commuteFor(home, mode),
       monthlyCost: monthlyCostFor(home, mode),
     }))
-    .filter((home) => home.commute <= maxMinutes)
+    .filter((home) => home.commute <= maxMinutes && home.rent <= maxRent)
 }
 
 export function getManualResults(
   mode: TravelMode,
   maxMinutes: number,
+  maxRent: number,
   homeList: Home[] = homes
 ): ExplorerResult {
-  const results = reachable(mode, maxMinutes, homeList).sort(
+  const results = reachable(mode, maxMinutes, maxRent, homeList).sort(
     (a, b) => a.commute - b.commute || a.rent - b.rent
   )
   return { results, mode, winnerId: null }
@@ -280,10 +289,11 @@ export function getManualResults(
 export function getOptimizedResults(
   optimizer: Optimizer,
   maxMinutes: number,
+  maxRent: number,
   homeList: Home[] = homes
 ): ExplorerResult {
   const mode: TravelMode = optimizer === "cheapest" ? "train" : "rideshare"
-  const candidates = reachable(mode, maxMinutes, homeList)
+  const candidates = reachable(mode, maxMinutes, maxRent, homeList)
   const winner = [...candidates]
     .sort((a, b) =>
       optimizer === "cheapest"
