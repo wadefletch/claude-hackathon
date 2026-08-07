@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useChat } from "@ai-sdk/react"
+import { useNavigate } from "@tanstack/react-router"
 import {
   Bot,
   Building2,
@@ -8,7 +10,6 @@ import {
   DollarSign,
   ExternalLink,
   Footprints,
-  MessageSquareText,
   MapPin,
   Navigation,
   Send,
@@ -21,7 +22,6 @@ import {
   X,
 } from "lucide-react"
 
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -53,6 +53,7 @@ import {
 import type { Optimizer, TravelMode } from "@/lib/housing-data"
 import { getBuildingReviewData } from "@/lib/building-reviews"
 import { getNeighborhoodSnapshot } from "@/lib/neighborhood-data"
+import type { ShowMapInput } from "@/lib/agent/schemas"
 import { cn } from "@/lib/utils"
 
 const modeIcons = {
@@ -80,6 +81,44 @@ export function HousingExplorer() {
   >("overview")
   const detailDialogRef = useRef<HTMLDialogElement>(null)
   const detailTriggerRef = useRef<HTMLElement | null>(null)
+  const {
+    messages: chatMessages,
+    sendMessage: sendChatMessage,
+    status: chatStatus,
+  } = useChat()
+  const [chatInput, setChatInput] = useState("")
+
+  // Agent-produced app/map state lives in the URL (query params), not just
+  // in this component's memory, so a reload/back-forward preserves it and
+  // other consumers (the map, other panels) can read it independently of
+  // the chat thread. Navigating updates the query string without a full
+  // page reload.
+  const navigate = useNavigate({ from: "/" })
+
+  const latestShowMapOutput = useMemo(() => {
+    for (let i = chatMessages.length - 1; i >= 0; i--) {
+      const message = chatMessages[i]
+      for (let j = message.parts.length - 1; j >= 0; j--) {
+        const part = message.parts[j]
+        if (part.type === "tool-show_map" && part.state === "output-available") {
+          return part.output as ShowMapInput
+        }
+      }
+    }
+    return null
+  }, [chatMessages])
+
+  useEffect(() => {
+    if (!latestShowMapOutput) return
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        profile: latestShowMapOutput.profile,
+        matches: latestShowMapOutput.matches,
+      }),
+      replace: true,
+    })
+  }, [latestShowMapOutput, navigate])
 
   useEffect(() => {
     if (explorer.results.some((home) => home.id === selectedId)) return
@@ -1022,84 +1061,139 @@ export function HousingExplorer() {
                   aria-hidden="true"
                 />
               </div>
-              <p className="text-xs text-muted-foreground">Filter copilot</p>
+              <p className="text-xs text-muted-foreground">
+                Ask about commute, budget, or eligibility
+              </p>
             </div>
-            <Badge variant="outline" className="ml-auto">
-              UI preview
-            </Badge>
           </header>
 
-          <Alert className="m-3 w-auto">
-            <MessageSquareText />
-            <AlertDescription>
-              <strong>Not connected</strong> · Agent responses are not enabled.
-            </AlertDescription>
-          </Alert>
-
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-1 lg:grid lg:grid-cols-2 xl:flex">
-            <div className="flex items-start gap-2">
-              <span
-                className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
-                aria-hidden="true"
-              >
-                <Bot className="size-3" />
-              </span>
-              <p className="rounded-lg bg-muted p-3 text-sm leading-6 text-muted-foreground">
-                Chat will live here. A future housing agent will translate
-                requests into the filters on the left.
-              </p>
-            </div>
-
-            <section
-              className="rounded-xl border p-4"
-              aria-labelledby="active-summary-title"
-            >
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h3 id="active-summary-title" className="text-sm font-medium">
-                  Example request
-                </h3>
-                <span className="text-xs text-muted-foreground">
-                  Static preview
+          <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+            {chatMessages.length === 0 && (
+              <div className="flex items-start gap-2">
+                <span
+                  className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
+                  aria-hidden="true"
+                >
+                  <Bot className="size-3" />
                 </span>
+                <p className="rounded-lg bg-muted p-3 text-sm leading-6 text-muted-foreground">
+                  Tell me about your commute, budget, and household — or ask
+                  &ldquo;see if I qualify&rdquo; to check affordable housing
+                  eligibility.
+                </p>
               </div>
-              <blockquote className="text-sm leading-6 text-muted-foreground italic">
-                “Show me quiet one-bedrooms near the train, and avoid reviews
-                mentioning thin walls.”
-              </blockquote>
-              <p className="mt-3 flex items-center gap-2 border-t pt-3 text-xs text-muted-foreground">
-                <SlidersHorizontal className="size-3" aria-hidden="true" />
-                Future chat requests will update the filter rail.
-              </p>
-            </section>
+            )}
+            {chatMessages.map((message) => (
+              <div
+                key={message.id}
+                className={cn(
+                  "flex items-start gap-2",
+                  message.role === "user" && "flex-row-reverse"
+                )}
+              >
+                {message.role === "assistant" && (
+                  <span
+                    className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground"
+                    aria-hidden="true"
+                  >
+                    <Bot className="size-3" />
+                  </span>
+                )}
+                <div className="flex min-w-0 flex-1 flex-col gap-3">
+                  {message.parts.map((part, index) => {
+                    if (part.type === "text") {
+                      return (
+                        <p
+                          key={`${message.id}-${index}`}
+                          className={cn(
+                            "rounded-lg p-3 text-sm leading-6",
+                            message.role === "user"
+                              ? "ml-auto max-w-[85%] bg-primary text-primary-foreground"
+                              : "max-w-[85%] bg-muted text-muted-foreground"
+                          )}
+                        >
+                          {part.text}
+                        </p>
+                      )
+                    }
+                    if (
+                      part.type === "tool-show_map" &&
+                      part.state === "output-available"
+                    ) {
+                      const payload = part.output as ShowMapInput
+                      return (
+                        <div
+                          key={`${message.id}-${index}`}
+                          className="flex flex-col gap-3"
+                        >
+                          {payload.matches.map((match) => {
+                            const workRoute = match.routes.find(
+                              (route) => route.purpose === "work"
+                            )
+                            return (
+                              <Card key={match.housing.id}>
+                                <CardHeader>
+                                  <CardDescription>
+                                    {match.housing.communityArea ??
+                                      match.housing.propertyName}
+                                  </CardDescription>
+                                  <CardTitle className="text-sm">
+                                    {match.housing.address}
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="text-sm text-muted-foreground">
+                                  {workRoute && (
+                                    <p>
+                                      {workRoute.durationMinutes} min by{" "}
+                                      {workRoute.mode} to work
+                                    </p>
+                                  )}
+                                  <p className="mt-2 leading-6">
+                                    {match.rationale}
+                                  </p>
+                                </CardContent>
+                              </Card>
+                            )
+                          })}
+                        </div>
+                      )
+                    }
+                    return null
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
 
-          <div className="grid grid-cols-[1fr_auto] gap-2 border-t p-3">
+          <form
+            className="grid grid-cols-[1fr_auto] gap-2 border-t p-3"
+            onSubmit={(event) => {
+              event.preventDefault()
+              if (!chatInput.trim()) return
+              sendChatMessage({ text: chatInput })
+              setChatInput("")
+            }}
+          >
             <Label htmlFor="agent-message" className="sr-only">
               Message the housing agent
             </Label>
             <Textarea
               id="agent-message"
               className="min-h-16 resize-none"
-              placeholder="Ask for a neighborhood, commute, or review signal…"
-              aria-describedby="composer-note"
+              value={chatInput}
+              onChange={(event) => setChatInput(event.target.value)}
+              placeholder='Ask for a neighborhood, commute, or say "see if I qualify"…'
               rows={2}
-              disabled
+              disabled={chatStatus === "streaming"}
             />
             <Button
               className="h-16"
-              type="button"
-              disabled
-              aria-label="Send unavailable in UI preview"
+              type="submit"
+              disabled={chatStatus === "streaming" || !chatInput.trim()}
             >
               <Send data-icon="inline-start" /> Send
             </Button>
-            <p
-              id="composer-note"
-              className="col-span-full text-xs text-muted-foreground"
-            >
-              Preview only · no message will be sent.
-            </p>
-          </div>
+          </form>
         </aside>
       </div>
     </main>

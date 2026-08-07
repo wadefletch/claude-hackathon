@@ -32,6 +32,7 @@ const AVERAGE_SPEED_MPH = {
   bike: 10,
   transit: 15,
   car: 25,
+  rideshare: 22, // similar to car, slightly lower to account for pickup wait
 } as const
 
 export type EstimateTravelMode = keyof typeof AVERAGE_SPEED_MPH

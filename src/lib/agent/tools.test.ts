@@ -41,7 +41,7 @@ describe("agent tools", () => {
     )
     expect(detail.rentRangeUsd).toBeDefined()
     expect(detail.reviews?.length).toBeGreaterThan(0)
-    expect(detail.source).toBe("mock")
+    expect(detail.isMock).toBe(true)
   })
 
   it("computeRoute estimates a longer duration for walking than driving", async () => {
