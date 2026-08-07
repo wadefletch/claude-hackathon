@@ -20,6 +20,7 @@ import {
   MarkerLabel,
   useMap,
 } from "@/components/ui/map"
+import { HandGestureMapControls } from "@/components/hand-gesture-map-controls"
 import { useGeoapifyIsochrone } from "@/hooks/use-geoapify-isochrone"
 import type { IsochroneMode } from "@/hooks/use-geoapify-isochrone"
 import { cn } from "@/lib/utils"
@@ -95,6 +96,7 @@ export function AppMap({ state, onHomeSelect, className }: AppMapProps) {
     >
       <Map loading={isIsochroneLoading}>
         <MapControls showCompass showFullscreen />
+        <HandGestureMapControls />
         <MapDataLayerControls
           visibleLayerIds={visibleLayerIds}
           onVisibleLayerIdsChange={setLayerVisibilities}
