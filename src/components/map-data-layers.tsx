@@ -5,12 +5,21 @@ import { BusFront, ShoppingBasket } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 import { TransitLayers } from "@/components/transit-layers"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field"
 import { useMap } from "@/components/ui/map"
+import { Switch } from "@/components/ui/switch"
 import {
   dataSourceMarkerImageId,
   registerDataSourceMarkerIcons,
 } from "@/lib/map-data-source-icons"
+import { MAP_LAYER_ANCHOR_IDS } from "@/lib/map-layer-order"
+import type { MapLayerPlacement } from "@/lib/map-layer-order"
 
 export type MapDataLayerFeature = {
   layerId: string
@@ -20,6 +29,7 @@ export type MapDataLayerFeature = {
 }
 
 type MapDataLayerComponentProps = {
+  beforeId: string
   onSelect: (feature: MapDataLayerFeature) => void
 }
 
@@ -29,11 +39,12 @@ type MapDataLayerDefinition = {
   description: string
   icon: LucideIcon
   defaultVisible: boolean
+  placement: MapLayerPlacement
   component: ComponentType<MapDataLayerComponentProps>
 }
 
-function TransitDataLayer() {
-  return <TransitLayers />
+function TransitDataLayer({ beforeId }: MapDataLayerComponentProps) {
+  return <TransitLayers beforeId={beforeId} />
 }
 
 /**
@@ -47,6 +58,7 @@ export const MAP_DATA_LAYERS = [
     description: "CTA train lines, stations, bus routes, and stops",
     icon: BusFront,
     defaultVisible: false,
+    placement: "transit",
     component: TransitDataLayer,
   },
   {
@@ -55,6 +67,7 @@ export const MAP_DATA_LAYERS = [
     description: "Full-service grocery stores and their operating status",
     icon: ShoppingBasket,
     defaultVisible: true,
+    placement: "foreground",
     component: GroceryStoresDataLayer,
   },
 ] as const satisfies readonly MapDataLayerDefinition[]
@@ -65,10 +78,6 @@ export const DEFAULT_VISIBLE_MAP_DATA_LAYER_IDS: MapDataLayerId[] =
   MAP_DATA_LAYERS.filter((layer) => layer.defaultVisible).map(
     (layer) => layer.id
   )
-
-function isMapDataLayerId(layerId: string): layerId is MapDataLayerId {
-  return MAP_DATA_LAYERS.some((layer) => layer.id === layerId)
-}
 
 export function MapDataLayers({
   visibleLayerIds,
@@ -83,6 +92,7 @@ export function MapDataLayers({
     visibleLayers.has(layer.id)
       ? createElement(layer.component, {
           key: layer.id,
+          beforeId: MAP_LAYER_ANCHOR_IDS[layer.placement],
           onSelect: onFeatureSelect,
         })
       : null
@@ -96,35 +106,46 @@ export function MapDataLayerControls({
   visibleLayerIds: readonly MapDataLayerId[]
   onVisibleLayerIdsChange: (layerIds: MapDataLayerId[]) => void
 }) {
+  const controlId = useId()
   const visibleLayers = new Set(visibleLayerIds)
 
+  const setLayerVisibility = (layerId: MapDataLayerId, visible: boolean) => {
+    const nextVisibleLayerIds = visible
+      ? [...visibleLayerIds, layerId]
+      : visibleLayerIds.filter((visibleLayerId) => visibleLayerId !== layerId)
+
+    onVisibleLayerIdsChange(nextVisibleLayerIds)
+  }
+
   return (
-    <ToggleGroup
-      variant="outline"
-      size="sm"
-      spacing={1}
-      multiple
-      value={visibleLayerIds}
-      onValueChange={(layerIds) =>
-        onVisibleLayerIdsChange(layerIds.filter(isMapDataLayerId))
-      }
-      aria-label="Map data layers"
-      className="absolute top-2 left-2 z-10 flex-wrap bg-background shadow-sm"
-    >
-      {MAP_DATA_LAYERS.map((layer) => {
-        const Icon = layer.icon
-        return (
-          <ToggleGroupItem
-            key={layer.id}
-            value={layer.id}
-            aria-label={`${visibleLayers.has(layer.id) ? "Hide" : "Show"} ${layer.description}`}
-          >
-            <Icon data-icon="inline-start" />
-            {layer.label}
-          </ToggleGroupItem>
-        )
-      })}
-    </ToggleGroup>
+    <FieldSet className="absolute top-2 left-2 z-10 min-w-40 gap-2 rounded-md border bg-background p-2.5 shadow-sm">
+      <FieldLegend variant="label" className="mb-0">
+        Map layers
+      </FieldLegend>
+      <FieldGroup className="gap-2">
+        {MAP_DATA_LAYERS.map((layer) => {
+          const Icon = layer.icon
+          const switchId = `${controlId}-${layer.id}`
+
+          return (
+            <Field key={layer.id} orientation="horizontal">
+              <FieldLabel htmlFor={switchId} title={layer.description}>
+                <Icon data-icon="inline-start" />
+                {layer.label}
+              </FieldLabel>
+              <Switch
+                id={switchId}
+                size="sm"
+                checked={visibleLayers.has(layer.id)}
+                onCheckedChange={(checked) =>
+                  setLayerVisibility(layer.id, checked)
+                }
+              />
+            </Field>
+          )
+        })}
+      </FieldGroup>
+    </FieldSet>
   )
 }
 
@@ -134,7 +155,10 @@ type GroceryStoreProperties = {
   new_status?: string
 }
 
-function GroceryStoresDataLayer({ onSelect }: MapDataLayerComponentProps) {
+function GroceryStoresDataLayer({
+  beforeId,
+  onSelect,
+}: MapDataLayerComponentProps) {
   const { map, isLoaded } = useMap()
   const id = useId()
   const sourceId = `grocery-stores-source-${id}`
@@ -179,25 +203,36 @@ function GroceryStoresDataLayer({ onSelect }: MapDataLayerComponentProps) {
         data: "/data/grocery-store-status-historical.geojson",
       })
 
-      map.addLayer({
-        id: layerId,
-        type: "symbol",
-        source: sourceId,
-        layout: {
-          "icon-image": [
-            "match",
-            ["get", "new_status"],
-            "CLOSED",
-            dataSourceMarkerImageId("groceryStoreClosed"),
-            "ONLINE ORDERS ONLY",
-            dataSourceMarkerImageId("groceryStoreLimited"),
-            dataSourceMarkerImageId("groceryStore"),
-          ],
-          "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 0.68, 14, 0.94],
-          "icon-allow-overlap": false,
-          "icon-padding": 2,
+      map.addLayer(
+        {
+          id: layerId,
+          type: "symbol",
+          source: sourceId,
+          layout: {
+            "icon-image": [
+              "match",
+              ["get", "new_status"],
+              "CLOSED",
+              dataSourceMarkerImageId("groceryStoreClosed"),
+              "ONLINE ORDERS ONLY",
+              dataSourceMarkerImageId("groceryStoreLimited"),
+              dataSourceMarkerImageId("groceryStore"),
+            ],
+            "icon-size": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              9,
+              0.68,
+              14,
+              0.94,
+            ],
+            "icon-allow-overlap": false,
+            "icon-padding": 2,
+          },
         },
-      })
+        beforeId
+      )
 
       map.on("click", layerId, handleClick)
       map.on("mouseenter", layerId, handleMouseEnter)
@@ -215,7 +250,7 @@ function GroceryStoresDataLayer({ onSelect }: MapDataLayerComponentProps) {
       if (map.getSource(sourceId)) map.removeSource(sourceId)
       map.getCanvas().style.cursor = ""
     }
-  }, [isLoaded, layerId, map, onSelect, sourceId])
+  }, [beforeId, isLoaded, layerId, map, onSelect, sourceId])
 
   return null
 }

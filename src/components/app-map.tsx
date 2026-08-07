@@ -7,6 +7,7 @@ import {
   MapDataLayerControls,
   MapDataLayers,
 } from "@/components/map-data-layers"
+import { MapLayerAnchors } from "@/components/map-layer-anchors"
 import type {
   MapDataLayerFeature,
   MapDataLayerId,
@@ -25,6 +26,7 @@ import { HandGestureMapControls } from "@/components/hand-gesture-map-controls"
 import { useGeoapifyIsochrone } from "@/hooks/use-geoapify-isochrone"
 import type { IsochroneMode } from "@/hooks/use-geoapify-isochrone"
 import { interpolateIsochrone } from "@/lib/isochrone-animation"
+import { MAP_LAYER_ANCHOR_IDS } from "@/lib/map-layer-order"
 import { cn } from "@/lib/utils"
 
 export type AppMapLocation = {
@@ -134,17 +136,19 @@ export function AppMap({
           visibleLayerIds={visibleLayerIds}
           onVisibleLayerIdsChange={setLayerVisibilities}
         />
-        <MapDataLayers
-          visibleLayerIds={visibleLayerIds}
-          onFeatureSelect={setSelectedDataLayerFeature}
-        />
-        {isochrone && isochroneData && (
-          <AnimatedIsochroneLayer
-            data={isochroneData}
-            color={isochroneColor}
-            isStale={isIsochroneStale}
+        <MapLayerAnchors>
+          <MapDataLayers
+            visibleLayerIds={visibleLayerIds}
+            onFeatureSelect={setSelectedDataLayerFeature}
           />
-        )}
+          {isochrone && isochroneData && (
+            <AnimatedIsochroneLayer
+              data={isochroneData}
+              color={isochroneColor}
+              isStale={isIsochroneStale}
+            />
+          )}
+        </MapLayerAnchors>
         <HomesLayer
           homes={homes}
           groups={neighborhoodGroups}
@@ -337,6 +341,7 @@ function AnimatedIsochroneLayer({
     <MapGeoJSON
       id="travel-time-isochrone"
       data={animatedData}
+      beforeId={MAP_LAYER_ANCHOR_IDS.coverage}
       fillPaint={{
         "fill-color": layerColor,
         "fill-color-transition": { duration: 200 },

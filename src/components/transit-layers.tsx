@@ -24,26 +24,6 @@ const TRANSIT_LAYER_IDS = [
 const CTA_ATTRIBUTION =
   "Chicago Transit Authority via City of Chicago Data Portal"
 
-function getFirstLabelLayer(
-  map: NonNullable<ReturnType<typeof useMap>["map"]>
-) {
-  const layers = map.getStyle().layers
-
-  // The basemap interleaves a few early symbol layers (waterway labels) with
-  // geometry, so the *first* symbol layer sits underneath roads, rail and
-  // buildings — anything inserted there disappears as those layers fade in on
-  // zoom. Anchor to the first symbol layer that follows all basemap geometry
-  // instead, which keeps transit above the streets but below place labels.
-  let lastGeometryIndex = -1
-  for (let i = 0; i < layers.length; i++) {
-    if (layers[i].type !== "symbol") lastGeometryIndex = i
-  }
-
-  return layers.find(
-    (layer, index) => layer.type === "symbol" && index > lastGeometryIndex
-  )?.id
-}
-
 function chicagoGeoJson(datasetId: string, fields: string[]) {
   const query = new URLSearchParams({
     $limit: "50000",
@@ -78,16 +58,12 @@ const TRANSIT_DATA = {
   ]),
 } as const
 
-export function TransitLayers() {
+export function TransitLayers({ beforeId }: { beforeId: string }) {
   const { map, isLoaded } = useMap()
 
   useEffect(() => {
     if (!map || !isLoaded) return
     let cancelled = false
-
-    // Keep transit above every basemap geometry layer, including buildings,
-    // while preserving basemap labels above the overlay.
-    const firstLabelLayer = getFirstLabelLayer(map)
 
     map.addSource("cta-bus-routes", {
       type: "geojson",
@@ -126,7 +102,7 @@ export function TransitLayers() {
           "line-width": ["interpolate", ["linear"], ["zoom"], 9, 1, 14, 2.5],
         },
       },
-      firstLabelLayer
+      beforeId
     )
 
     map.addLayer(
@@ -145,7 +121,7 @@ export function TransitLayers() {
           "line-width": ["interpolate", ["linear"], ["zoom"], 8, 4, 14, 7],
         },
       },
-      firstLabelLayer
+      beforeId
     )
 
     map.addLayer(
@@ -183,7 +159,7 @@ export function TransitLayers() {
           "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2.5, 14, 5],
         },
       },
-      firstLabelLayer
+      beforeId
     )
 
     map.addLayer(
@@ -199,7 +175,7 @@ export function TransitLayers() {
           "circle-stroke-width": 1.5,
         },
       },
-      firstLabelLayer
+      beforeId
     )
 
     void registerDataSourceMarkerIcons(map, ["railStation"]).then(() => {
@@ -226,7 +202,7 @@ export function TransitLayers() {
             "icon-padding": 2,
           },
         },
-        firstLabelLayer
+        beforeId
       )
     })
 
@@ -239,7 +215,7 @@ export function TransitLayers() {
         if (map.getSource(sourceId)) map.removeSource(sourceId)
       }
     }
-  }, [isLoaded, map])
+  }, [beforeId, isLoaded, map])
 
   return null
 }
