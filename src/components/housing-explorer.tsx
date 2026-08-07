@@ -1100,11 +1100,21 @@ export function HousingExplorer() {
                 >
                   <Bot className="size-3" />
                 </span>
-                <p className="rounded-lg bg-muted p-3 text-sm leading-6 text-foreground">
-                  Tell me about your commute, budget, and household — or ask
-                  &ldquo;see if I qualify&rdquo; to check affordable housing
-                  eligibility.
-                </p>
+                <div className="flex flex-col items-start gap-2">
+                  <p className="rounded-lg bg-muted p-3 text-sm leading-6 text-foreground">
+                    Tell me about your commute, budget, and household — or
+                    check whether you qualify for affordable housing.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={chatStatus === "streaming"}
+                    onClick={() => sendChatMessage({ text: "See if I qualify" })}
+                  >
+                    <SearchCheck data-icon="inline-start" /> See if I qualify
+                  </Button>
+                </div>
               </div>
             )}
             {chatMessages.map((message) => (
