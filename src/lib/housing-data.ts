@@ -1,5 +1,5 @@
 import { estimateDurationMinutes, haversineMiles } from "@/lib/agent/geo"
-import type { LatLng } from "@/lib/agent/geo"
+import type { EstimateTravelMode, LatLng } from "@/lib/agent/geo"
 import { mockHousingDetail } from "@/domain"
 import type { HousingDevelopment } from "@/domain"
 
@@ -14,12 +14,10 @@ export interface Home {
   rent: number
   beds: number
   coordinates: [number, number]
-  trainMinutes: number
 }
 
 export interface ModeConfig {
   label: string
-  factor: number
   // Monthly travel cost is per listing, not per mode: a fixed part that every
   // rider pays (a CTA pass, a downtown parking space) plus a part that scales
   // with how long that particular listing's commute is. Costs assume ~21
@@ -55,28 +53,24 @@ export const modes: Record<TravelMode, ModeConfig> = {
   // A 30-day CTA pass covers the ride; longer trips add a feeder bus leg.
   train: {
     label: "Train",
-    factor: 1,
     baseMonthlyCost: 75,
     monthlyCostPerCommuteMinute: 0.7,
   },
   // Walking is free no matter how far it is.
   walk: {
     label: "Walk",
-    factor: 2.4,
     baseMonthlyCost: 0,
     monthlyCostPerCommuteMinute: 0,
   },
   // Downtown parking dominates; fuel and tolls scale with the drive.
   drive: {
     label: "Drive",
-    factor: 0.78,
     baseMonthlyCost: 240,
     monthlyCostPerCommuteMinute: 4,
   },
   // Almost entirely per-trip, so this scales hardest with distance.
   rideshare: {
     label: "Rideshare",
-    factor: 0.68,
     baseMonthlyCost: 210,
     monthlyCostPerCommuteMinute: 23,
   },
@@ -91,7 +85,6 @@ export const homes: Home[] = [
     rent: 910,
     beds: 1,
     coordinates: [-87.673, 42.022],
-    trainMinutes: 47,
   },
   {
     id: "edgewater",
@@ -101,7 +94,6 @@ export const homes: Home[] = [
     rent: 1040,
     beds: 1,
     coordinates: [-87.66, 41.989],
-    trainMinutes: 38,
   },
   {
     id: "albany-park",
@@ -111,7 +103,6 @@ export const homes: Home[] = [
     rent: 980,
     beds: 2,
     coordinates: [-87.708, 41.968],
-    trainMinutes: 37,
   },
   {
     id: "uptown",
@@ -121,7 +112,6 @@ export const homes: Home[] = [
     rent: 1115,
     beds: 1,
     coordinates: [-87.655, 41.965],
-    trainMinutes: 31,
   },
   {
     id: "avondale",
@@ -131,7 +121,6 @@ export const homes: Home[] = [
     rent: 1085,
     beds: 2,
     coordinates: [-87.718, 41.936],
-    trainMinutes: 29,
   },
   {
     id: "logan-square",
@@ -141,7 +130,6 @@ export const homes: Home[] = [
     rent: 1160,
     beds: 1,
     coordinates: [-87.707, 41.921],
-    trainMinutes: 25,
   },
   {
     id: "lakeview",
@@ -151,7 +139,6 @@ export const homes: Home[] = [
     rent: 1210,
     beds: 1,
     coordinates: [-87.668, 41.939],
-    trainMinutes: 28,
   },
   {
     id: "humboldt-park",
@@ -161,7 +148,6 @@ export const homes: Home[] = [
     rent: 950,
     beds: 2,
     coordinates: [-87.713, 41.903],
-    trainMinutes: 34,
   },
   {
     id: "west-town",
@@ -171,7 +157,6 @@ export const homes: Home[] = [
     rent: 1250,
     beds: 1,
     coordinates: [-87.664, 41.896],
-    trainMinutes: 19,
   },
   {
     id: "near-west",
@@ -181,7 +166,6 @@ export const homes: Home[] = [
     rent: 1185,
     beds: 2,
     coordinates: [-87.679, 41.881],
-    trainMinutes: 16,
   },
   {
     id: "loop",
@@ -191,7 +175,6 @@ export const homes: Home[] = [
     rent: 1340,
     beds: 0,
     coordinates: [-87.629, 41.875],
-    trainMinutes: 8,
   },
   {
     id: "bronzeville",
@@ -201,7 +184,6 @@ export const homes: Home[] = [
     rent: 1060,
     beds: 2,
     coordinates: [-87.616, 41.84],
-    trainMinutes: 23,
   },
   {
     id: "little-village",
@@ -211,7 +193,6 @@ export const homes: Home[] = [
     rent: 930,
     beds: 2,
     coordinates: [-87.694, 41.852],
-    trainMinutes: 30,
   },
   {
     id: "englewood",
@@ -221,7 +202,6 @@ export const homes: Home[] = [
     rent: 875,
     beds: 2,
     coordinates: [-87.645, 41.779],
-    trainMinutes: 42,
   },
   {
     id: "hyde-park",
@@ -231,7 +211,6 @@ export const homes: Home[] = [
     rent: 1095,
     beds: 1,
     coordinates: [-87.596, 41.795],
-    trainMinutes: 34,
   },
   {
     id: "south-shore",
@@ -241,49 +220,65 @@ export const homes: Home[] = [
     rent: 895,
     beds: 2,
     coordinates: [-87.552, 41.76],
-    trainMinutes: 49,
   },
 ]
 
-export function commuteFor(home: Home, mode: TravelMode) {
-  return Math.round(home.trainMinutes * modes[mode].factor)
+// Maps the explorer's TravelMode onto the geo model's mode vocabulary.
+const TRAVEL_MODE_TO_ESTIMATE_MODE: Record<TravelMode, EstimateTravelMode> = {
+  train: "transit",
+  walk: "walk",
+  drive: "car",
+  rideshare: "rideshare",
 }
 
-// What this listing costs to commute from, per month. The destination is
-// fixed, so a listing's commute time stands in for its distance to it.
-export function monthlyCostFor(home: Home, mode: TravelMode) {
+export function commuteFor(home: Home, mode: TravelMode, work: LatLng = LOOP) {
+  const homeLocation: LatLng = {
+    lat: home.coordinates[1],
+    lng: home.coordinates[0],
+  }
+  const miles = haversineMiles(homeLocation, work)
+  return estimateDurationMinutes(miles, TRAVEL_MODE_TO_ESTIMATE_MODE[mode])
+}
+
+// What this listing costs to commute from, per month, scaled by how long the
+// trip to `work` actually takes.
+export function monthlyCostFor(
+  home: Home,
+  mode: TravelMode,
+  work: LatLng = LOOP
+) {
   const { baseMonthlyCost, monthlyCostPerCommuteMinute } = modes[mode]
   const cost =
-    baseMonthlyCost + monthlyCostPerCommuteMinute * commuteFor(home, mode)
+    baseMonthlyCost + monthlyCostPerCommuteMinute * commuteFor(home, mode, work)
   return Math.round(cost / 5) * 5
 }
 
-// `homeList` defaults to the built-in fixtures so existing callers/tests keep
-// their old arity; the live explorer passes real developments and a rent
-// ceiling instead.
-function reachable(
-  mode: TravelMode,
-  maxMinutes: number,
-  maxRent: number,
-  homeList: Home[] = homes
-): HomeResult[] {
+export interface ExplorerQuery {
+  maxMinutes: number
+  maxRent: number
+  work: LatLng
+  // Defaults to the built-in fixtures so existing callers/tests keep working;
+  // the live explorer passes real developments instead.
+  homeList?: Home[]
+}
+
+function reachable(mode: TravelMode, query: ExplorerQuery): HomeResult[] {
+  const { maxMinutes, maxRent, work, homeList = homes } = query
   return homeList
     .map((home) => ({
       ...home,
       mode,
-      commute: commuteFor(home, mode),
-      monthlyCost: monthlyCostFor(home, mode),
+      commute: commuteFor(home, mode, work),
+      monthlyCost: monthlyCostFor(home, mode, work),
     }))
     .filter((home) => home.commute <= maxMinutes && home.rent <= maxRent)
 }
 
 export function getManualResults(
   mode: TravelMode,
-  maxMinutes: number,
-  maxRent: number,
-  homeList: Home[] = homes
+  query: ExplorerQuery
 ): ExplorerResult {
-  const results = reachable(mode, maxMinutes, maxRent, homeList).sort(
+  const results = reachable(mode, query).sort(
     (a, b) => a.commute - b.commute || a.rent - b.rent
   )
   return { results, mode, winnerId: null }
@@ -291,12 +286,10 @@ export function getManualResults(
 
 export function getOptimizedResults(
   optimizer: Optimizer,
-  maxMinutes: number,
-  maxRent: number,
-  homeList: Home[] = homes
+  query: ExplorerQuery
 ): ExplorerResult {
   const mode: TravelMode = optimizer === "cheapest" ? "train" : "rideshare"
-  const candidates = reachable(mode, maxMinutes, maxRent, homeList)
+  const candidates = reachable(mode, query)
   const winner = [...candidates]
     .sort((a, b) =>
       optimizer === "cheapest"
@@ -311,22 +304,22 @@ export function getOptimizedResults(
   }
 }
 
-// The Loop destination, matching WORK_LOCATION in the explorer, used to
-// estimate a transit baseline (`trainMinutes`) for each development.
-const LOOP: LatLng = { lat: 41.882, lng: -87.633 }
+// The Loop, used as the default work location if a caller doesn't have a
+// real one yet.
+export const LOOP: LatLng = { lat: 41.882, lng: -87.633 }
 
 /**
  * Map real Chicago affordable-housing developments into the `Home` shape the
- * explorer already renders. The feed has location/name/address; rent, beds, and
- * the transit baseline are estimated (mock rent/beds from `mockHousingDetail`,
- * `trainMinutes` from straight-line distance to the Loop).
+ * explorer already renders. The feed has location/name/address; rent and beds
+ * are estimated (mock rent/beds from `mockHousingDetail`). Commute times are
+ * computed on demand from `coordinates` against the caller's real work
+ * location via `commuteFor`.
  */
 export function buildHomesFromDevelopments(
   developments: HousingDevelopment[]
 ): Home[] {
   return developments.map((development) => {
     const detail = mockHousingDetail(development.id)
-    const miles = haversineMiles(development.location, LOOP)
     return {
       id: development.id,
       name: development.propertyName,
@@ -335,7 +328,6 @@ export function buildHomesFromDevelopments(
       rent: detail.rentUsd ?? 1000,
       beds: detail.beds ?? 1,
       coordinates: [development.location.lng, development.location.lat],
-      trainMinutes: Math.max(5, estimateDurationMinutes(miles, "transit")),
     }
   })
 }
