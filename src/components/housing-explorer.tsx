@@ -49,12 +49,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Label } from "@/components/ui/label"
-import {
-  Message,
-  MessageAvatar,
-  MessageContent,
-  MessageFooter,
-} from "@/components/ui/message"
+import { Message, MessageContent, MessageFooter } from "@/components/ui/message"
 import {
   ResizableHandle,
   ResizablePanel,
@@ -556,9 +551,6 @@ export function HousingExplorer() {
                   >
                     {chatMessages.length === 0 && (
                       <Message>
-                        <MessageAvatar className="size-8" aria-hidden="true">
-                          <Bot />
-                        </MessageAvatar>
                         <MessageContent>
                           <Bubble variant="muted">
                             <BubbleContent>
@@ -591,11 +583,6 @@ export function HousingExplorer() {
                         key={message.id}
                         align={message.role === "user" ? "end" : "start"}
                       >
-                        {message.role === "assistant" && (
-                          <MessageAvatar className="size-8" aria-hidden="true">
-                            <Bot />
-                          </MessageAvatar>
-                        )}
                         <MessageContent>
                           {message.parts.map((part, index) => {
                             if (part.type === "text") {
