@@ -101,11 +101,17 @@ export function getMapMotion(
 export function smoothMapMotion(
   previous: MapMotion,
   target: MapMotion,
-  alpha = 0.16
+  alpha = 0.16,
+  settleThreshold = { pan: 3.5, zoom: 0.04 }
 ): MapMotion {
+  const settle = (current: number, next: number, threshold: number) =>
+    Math.abs(next - current) <= threshold
+      ? current
+      : current + (next - current) * alpha
+
   return {
-    panX: previous.panX + (target.panX - previous.panX) * alpha,
-    panY: previous.panY + (target.panY - previous.panY) * alpha,
-    zoom: previous.zoom + (target.zoom - previous.zoom) * alpha,
+    panX: settle(previous.panX, target.panX, settleThreshold.pan),
+    panY: settle(previous.panY, target.panY, settleThreshold.pan),
+    zoom: settle(previous.zoom, target.zoom, settleThreshold.zoom),
   }
 }

@@ -180,14 +180,25 @@ export function HandGestureMapControls() {
 
       const panX = nextMotion.panX - previousMotion.panX
       const panY = nextMotion.panY - previousMotion.panY
-      if (panX || panY) map.panBy([panX, panY], { duration: 0 })
-      if (nextMotion.zoom) {
-        map.setZoom(
-          Math.max(
-            map.getMinZoom(),
-            Math.min(map.getMaxZoom(), baseZoomRef.current + nextMotion.zoom)
-          )
-        )
+      const zoom = Math.max(
+        map.getMinZoom(),
+        Math.min(map.getMaxZoom(), baseZoomRef.current + nextMotion.zoom)
+      )
+
+      // Keep every visual layer on the same camera state. Separate panBy and
+      // setZoom calls emitted two move cycles per video frame, so WebGL layers
+      // and DOM-backed markers could briefly render different transforms.
+      const cameraChanged =
+        Math.abs(panX) > 0.01 ||
+        Math.abs(panY) > 0.01 ||
+        Math.abs(zoom - map.getZoom()) > 0.0001
+      if (cameraChanged) {
+        const centerPoint = map.project(map.getCenter())
+        const center = map.unproject([
+          centerPoint.x + panX,
+          centerPoint.y + panY,
+        ])
+        map.jumpTo({ center, zoom })
       }
 
       setTrackerState(activeBaseline.kind === "zoom" ? "zooming" : "panning")
