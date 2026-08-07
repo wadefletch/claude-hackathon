@@ -4,6 +4,7 @@ import { z } from "zod"
 import { HousingExplorer } from "@/components/housing-explorer"
 import { UserProfile } from "@/domain"
 import { rankedHousingMatchSchema } from "@/lib/agent/schemas"
+import { fetchHousingFeed } from "@/server/feeds"
 
 // The agent-produced app/map state, persisted in the URL so it survives
 // reloads/back-forward and so other components (Wade's map, Rob's UI) can
@@ -17,5 +18,11 @@ export type AppSearch = z.infer<typeof appSearchSchema>
 
 export const Route = createFileRoute("/")({
   validateSearch: (search) => appSearchSchema.parse(search),
-  component: HousingExplorer,
+  loader: async () => ({ housing: await fetchHousingFeed() }),
+  component: RouteComponent,
 })
+
+function RouteComponent() {
+  const { housing } = Route.useLoaderData()
+  return <HousingExplorer developments={housing.developments} />
+}

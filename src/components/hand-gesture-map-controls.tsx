@@ -39,7 +39,7 @@ const stateCopy: Record<Exclude<TrackerState, "error">, string> = {
   zooming: "Two pinches · spread to zoom",
 }
 
-const PINCH_START_RATIO = 0.42
+const PINCH_START_RATIO = 0.35
 const PINCH_RELEASE_RATIO = 0.68
 const EMPTY_MOTION: MapMotion = { panX: 0, panY: 0, zoom: 0 }
 
