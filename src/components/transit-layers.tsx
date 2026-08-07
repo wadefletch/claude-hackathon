@@ -1,6 +1,10 @@
 import { useEffect } from "react"
 
 import { useMap } from "@/components/ui/map"
+import {
+  dataSourceMarkerImageId,
+  registerDataSourceMarkerIcons,
+} from "@/lib/map-data-source-icons"
 
 const TRANSIT_SOURCE_IDS = [
   "cta-bus-routes",
@@ -14,35 +18,16 @@ const TRANSIT_LAYER_IDS = [
   "cta-rail-lines-casing",
   "cta-rail-lines-line",
   "cta-bus-stops-circle",
-  "cta-rail-stations-circle",
+  "cta-rail-stations-symbol",
 ] as const
 
 const CTA_ATTRIBUTION =
   "Chicago Transit Authority via City of Chicago Data Portal"
 
-const ROAD_LAYER_PATTERN =
-  /road|street|motorway|highway|transport|tunnel|bridge/i
-
-function getLayerAboveRoads(
+function getFirstLabelLayer(
   map: NonNullable<ReturnType<typeof useMap>["map"]>
 ) {
-  const layers = map.getStyle().layers
-
-  for (let index = layers.length - 1; index >= 0; index -= 1) {
-    const layer = layers[index]
-    if (layer.type !== "line") continue
-
-    const sourceLayer =
-      "source-layer" in layer && typeof layer["source-layer"] === "string"
-        ? layer["source-layer"]
-        : ""
-
-    if (ROAD_LAYER_PATTERN.test(`${layer.id} ${sourceLayer}`)) {
-      return layers[index + 1]?.id
-    }
-  }
-
-  return layers.find((layer) => layer.type === "symbol")?.id
+  return map.getStyle().layers.find((layer) => layer.type === "symbol")?.id
 }
 
 function chicagoGeoJson(datasetId: string, fields: string[]) {
@@ -84,8 +69,11 @@ export function TransitLayers() {
 
   useEffect(() => {
     if (!map || !isLoaded) return
+    let cancelled = false
 
-    const layerAboveRoads = getLayerAboveRoads(map)
+    // Keep transit above every basemap geometry layer, including buildings,
+    // while preserving basemap labels above the overlay.
+    const firstLabelLayer = getFirstLabelLayer(map)
 
     map.addSource("cta-bus-routes", {
       type: "geojson",
@@ -124,7 +112,7 @@ export function TransitLayers() {
           "line-width": ["interpolate", ["linear"], ["zoom"], 9, 1, 14, 2.5],
         },
       },
-      layerAboveRoads
+      firstLabelLayer
     )
 
     map.addLayer(
@@ -143,7 +131,7 @@ export function TransitLayers() {
           "line-width": ["interpolate", ["linear"], ["zoom"], 8, 4, 14, 7],
         },
       },
-      layerAboveRoads
+      firstLabelLayer
     )
 
     map.addLayer(
@@ -181,7 +169,7 @@ export function TransitLayers() {
           "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2.5, 14, 5],
         },
       },
-      layerAboveRoads
+      firstLabelLayer
     )
 
     map.addLayer(
@@ -197,26 +185,39 @@ export function TransitLayers() {
           "circle-stroke-width": 1.5,
         },
       },
-      layerAboveRoads
+      firstLabelLayer
     )
 
-    map.addLayer(
-      {
-        id: "cta-rail-stations-circle",
-        type: "circle",
-        source: "cta-rail-stations",
-        minzoom: 9,
-        paint: {
-          "circle-color": "#ffffff",
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 3, 14, 5],
-          "circle-stroke-color": "#171717",
-          "circle-stroke-width": 1.5,
+    void registerDataSourceMarkerIcons(map, ["railStation"]).then(() => {
+      if (cancelled) return
+
+      map.addLayer(
+        {
+          id: "cta-rail-stations-symbol",
+          type: "symbol",
+          source: "cta-rail-stations",
+          minzoom: 9,
+          layout: {
+            "icon-image": dataSourceMarkerImageId("railStation"),
+            "icon-size": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              9,
+              0.7,
+              14,
+              0.96,
+            ],
+            "icon-allow-overlap": false,
+            "icon-padding": 2,
+          },
         },
-      },
-      layerAboveRoads
-    )
+        firstLabelLayer
+      )
+    })
 
     return () => {
+      cancelled = true
       for (const layerId of [...TRANSIT_LAYER_IDS].reverse()) {
         if (map.getLayer(layerId)) map.removeLayer(layerId)
       }
