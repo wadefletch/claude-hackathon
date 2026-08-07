@@ -1,5 +1,6 @@
 import { useEffect, useId } from "react"
 import type { MapLayerMouseEvent } from "maplibre-gl"
+import { Building2, Sparkles } from "lucide-react"
 
 import {
   Map,
@@ -7,7 +8,6 @@ import {
   MapGeoJSON,
   MapMarker,
   MapPopup,
-  MapRoute,
   MarkerContent,
   MarkerLabel,
   useMap,
@@ -19,6 +19,11 @@ import { cn } from "@/lib/utils"
 export type AppMapLocation = {
   label: string
   coordinates: [number, number]
+}
+
+export type AppMapHome = AppMapLocation & {
+  id: string
+  rent?: number
 }
 
 export type GroceryStoreSelection = {
@@ -34,32 +39,41 @@ export type IsochroneOptions = {
   origin?: AppMapLocation
 }
 
-export type AppMapProps = {
-  home: AppMapLocation
+export type AppMapState = {
   work: AppMapLocation
-  routeCoordinates: [number, number][] | null
-  isLoading: boolean
+  homes: AppMapHome[]
+  selectedHomeId: string | null
+  winnerId: string | null
   showGroceryStores: boolean
   selectedGroceryStore: GroceryStoreSelection | null
-  onGroceryStoreSelect: (store: GroceryStoreSelection | null) => void
   isochrone?: IsochroneOptions
+}
+
+export type AppMapProps = {
+  state: AppMapState
+  onHomeSelect: (home: AppMapHome, trigger: HTMLElement) => void
+  onGroceryStoreSelect: (store: GroceryStoreSelection | null) => void
   className?: string
 }
 
 type GroceryStoreProperties = Omit<GroceryStoreSelection, "coordinates">
 
 export function AppMap({
-  home,
-  work,
-  routeCoordinates,
-  isLoading,
-  showGroceryStores,
-  selectedGroceryStore,
+  state,
+  onHomeSelect,
   onGroceryStoreSelect,
-  isochrone,
   className,
 }: AppMapProps) {
-  const isochroneOrigin = isochrone?.origin ?? home
+  const {
+    homes,
+    work,
+    selectedHomeId,
+    winnerId,
+    showGroceryStores,
+    selectedGroceryStore,
+    isochrone,
+  } = state
+  const isochroneOrigin = isochrone?.origin ?? work
   const { data: isochroneData, isFetching: isIsochroneLoading } =
     useGeoapifyIsochrone(
       isochrone
@@ -79,9 +93,9 @@ export function AppMap({
         "h-96 w-full overflow-hidden rounded-xl border shadow-sm",
         className
       )}
-      aria-label={`Driving route from ${home.label} to ${work.label}`}
+      aria-label={`Map of homes near ${work.label}`}
     >
-      <Map loading={isLoading || isIsochroneLoading}>
+      <Map loading={isIsochroneLoading}>
         <MapControls showCompass showFullscreen />
         {isochroneData && (
           <MapGeoJSON
@@ -97,8 +111,16 @@ export function AppMap({
             }}
           />
         )}
-        <LocationMarker location={home} type="Home" />
-        <LocationMarker location={work} type="Work" />
+        {homes.map((home) => (
+          <HomeMarker
+            key={home.id}
+            home={home}
+            isSelected={selectedHomeId === home.id}
+            isWinner={winnerId === home.id}
+            onSelect={onHomeSelect}
+          />
+        ))}
+        <WorkMarker location={work} />
         {showGroceryStores && (
           <GroceryStoresLayer onSelect={onGroceryStoreSelect} />
         )}
@@ -108,14 +130,54 @@ export function AppMap({
             onClose={() => onGroceryStoreSelect(null)}
           />
         )}
-        {routeCoordinates && (
-          <>
-            <MapRoute coordinates={routeCoordinates} width={5} opacity={0.9} />
-            <RouteViewport coordinates={routeCoordinates} />
-          </>
-        )}
+        <LocationsViewport
+          coordinates={[
+            work.coordinates,
+            ...homes.map((home) => home.coordinates),
+          ]}
+        />
       </Map>
     </section>
+  )
+}
+
+function HomeMarker({
+  home,
+  isSelected,
+  isWinner,
+  onSelect,
+}: {
+  home: AppMapHome
+  isSelected: boolean
+  isWinner: boolean
+  onSelect?: (home: AppMapHome, trigger: HTMLElement) => void
+}) {
+  return (
+    <MapMarker
+      longitude={home.coordinates[0]}
+      latitude={home.coordinates[1]}
+      onClick={(event) => onSelect?.(home, event.currentTarget as HTMLElement)}
+    >
+      <MarkerContent>
+        <button
+          type="button"
+          className={cn(
+            "grid size-8 place-items-center rounded-full border-2 border-primary-foreground bg-primary text-primary-foreground shadow-sm transition-transform focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring",
+            isSelected && "scale-110 ring-4 ring-primary/20",
+            isWinner && "bg-amber-600"
+          )}
+          aria-label={`${home.label}${home.rent ? `, $${home.rent} rent` : ""}`}
+          aria-pressed={isSelected}
+        >
+          {isWinner ? (
+            <Sparkles className="size-4" />
+          ) : (
+            <Building2 className="size-4" />
+          )}
+        </button>
+        {home.rent && <MarkerLabel position="bottom">${home.rent}</MarkerLabel>}
+      </MarkerContent>
+    </MapMarker>
   )
 }
 
@@ -231,13 +293,7 @@ function GroceryStorePopup({
   )
 }
 
-function LocationMarker({
-  location,
-  type,
-}: {
-  location: AppMapLocation
-  type: "Home" | "Work"
-}) {
+function WorkMarker({ location }: { location: AppMapLocation }) {
   return (
     <MapMarker
       longitude={location.coordinates[0]}
@@ -245,15 +301,20 @@ function LocationMarker({
     >
       <MarkerContent>
         <div className="size-4 rounded-full bg-primary shadow-md ring-2 ring-background">
-          <MarkerLabel>{`${type}: ${location.label}`}</MarkerLabel>
+          <MarkerLabel>{`Work: ${location.label}`}</MarkerLabel>
         </div>
       </MarkerContent>
     </MapMarker>
   )
 }
 
-function RouteViewport({ coordinates }: { coordinates: [number, number][] }) {
+function LocationsViewport({
+  coordinates,
+}: {
+  coordinates: [number, number][]
+}) {
   const { map, isLoaded } = useMap()
+  const coordinatesKey = coordinates.flat().join(",")
 
   useEffect(() => {
     if (!map || !isLoaded || coordinates.length < 2) return
@@ -266,9 +327,9 @@ function RouteViewport({ coordinates }: { coordinates: [number, number][] }) {
         [Math.min(...longitudes), Math.min(...latitudes)],
         [Math.max(...longitudes), Math.max(...latitudes)],
       ],
-      { padding: 64, maxZoom: 13, duration: 700 }
+      { padding: 56, maxZoom: 13, duration: 700 }
     )
-  }, [coordinates, isLoaded, map])
+  }, [coordinatesKey, isLoaded, map])
 
   return null
 }

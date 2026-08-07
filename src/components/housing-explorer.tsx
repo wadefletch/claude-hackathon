@@ -22,6 +22,12 @@ import {
   X,
 } from "lucide-react"
 
+import { AppMap } from "@/components/app-map"
+import type {
+  AppMapHome,
+  AppMapState,
+  GroceryStoreSelection,
+} from "@/components/app-map"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -63,6 +69,11 @@ const modeIcons = {
   rideshare: Navigation,
 } satisfies Record<TravelMode, typeof TrainFront>
 
+const WORK_LOCATION = {
+  label: destination,
+  coordinates: [-87.633, 41.882] as [number, number],
+}
+
 export function HousingExplorer() {
   const [maxMinutes, setMaxMinutes] = useState(35)
   const [manualMode, setManualMode] = useState<TravelMode>("train")
@@ -74,7 +85,10 @@ export function HousingExplorer() {
         : getManualResults(manualMode, maxMinutes),
     [manualMode, maxMinutes, optimizer]
   )
+  const activeMode = explorer.mode
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedGroceryStore, setSelectedGroceryStore] =
+    useState<GroceryStoreSelection | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [detailTab, setDetailTab] = useState<
     "overview" | "reviews" | "neighborhood"
@@ -100,7 +114,10 @@ export function HousingExplorer() {
       const message = chatMessages[i]
       for (let j = message.parts.length - 1; j >= 0; j--) {
         const part = message.parts[j]
-        if (part.type === "tool-show_map" && part.state === "output-available") {
+        if (
+          part.type === "tool-show_map" &&
+          part.state === "output-available"
+        ) {
           return part.output as ShowMapInput
         }
       }
@@ -128,6 +145,10 @@ export function HousingExplorer() {
     setSelectedId(nextSelectedId)
     if (!nextSelectedId) setIsDetailOpen(false)
   }, [explorer])
+
+  useEffect(() => {
+    setSelectedGroceryStore(null)
+  }, [activeMode, maxMinutes])
 
   useEffect(() => {
     const dialog = detailDialogRef.current
@@ -161,9 +182,44 @@ export function HousingExplorer() {
     setOptimizer(null)
   }
 
-  const activeMode = explorer.mode
   const ActiveModeIcon = modeIcons[activeMode]
   const selectedHome = explorer.results.find((home) => home.id === selectedId)
+  const mapHomes = useMemo<AppMapHome[]>(
+    () =>
+      explorer.results.map((home) => ({
+        id: home.id,
+        label: `${home.name} · ${home.neighborhood}`,
+        coordinates: home.coordinates,
+        rent: home.rent,
+      })),
+    [explorer.results]
+  )
+  const mapState = useMemo<AppMapState>(
+    () => ({
+      homes: mapHomes,
+      work: WORK_LOCATION,
+      selectedHomeId: selectedId,
+      winnerId: explorer.winnerId,
+      showGroceryStores: true,
+      selectedGroceryStore,
+      isochrone:
+        activeMode === "walk"
+          ? undefined
+          : {
+              origin: WORK_LOCATION,
+              mode: activeMode === "train" ? "transit" : "drive",
+              minutes: maxMinutes,
+            },
+    }),
+    [
+      activeMode,
+      explorer.winnerId,
+      mapHomes,
+      maxMinutes,
+      selectedGroceryStore,
+      selectedId,
+    ]
+  )
   const reviewData = selectedHome ? getBuildingReviewData(selectedHome) : null
   const neighborhoodData = selectedHome
     ? getNeighborhoodSnapshot(selectedHome.id)
@@ -405,100 +461,14 @@ export function HousingExplorer() {
               </Badge>
             </div>
 
-            <div
-              className="relative isolate h-[440px] overflow-hidden bg-muted sm:h-[520px] xl:h-[650px]"
-              style={
-                {
-                  "--reach": `${22 + ((maxMinutes - 15) / 45) * 32}%`,
-                } as React.CSSProperties
+            <AppMap
+              className="h-[440px] rounded-none border-0 shadow-none sm:h-[520px] xl:h-[650px]"
+              state={mapState}
+              onHomeSelect={(home, trigger) =>
+                openBuildingDetail(home.id, trigger)
               }
-              aria-label={`Stylized Chicago map showing ${explorer.results.length} reachable homes`}
-            >
-              <div
-                className="absolute inset-y-0 right-[26%] left-0 [background-image:repeating-linear-gradient(0deg,transparent_0_37px,color-mix(in_oklch,var(--foreground)_15%,transparent)_38px_39px),repeating-linear-gradient(90deg,transparent_0_46px,color-mix(in_oklch,var(--foreground)_15%,transparent)_47px_48px)] opacity-40"
-                aria-hidden="true"
-              />
-              <div
-                className="absolute inset-y-0 right-0 w-[26%] overflow-hidden bg-sky-100 shadow-[-16px_0_25px_rgb(61_128_132_/_0.12)]"
-                aria-hidden="true"
-              >
-                <span className="absolute top-[45%] left-[31%] text-[0.65rem] font-medium tracking-[0.18em] text-sky-800/50 [writing-mode:vertical-rl]">
-                  LAKE MICHIGAN
-                </span>
-              </div>
-              <div
-                className="absolute top-[calc(65%-var(--reach)/2)] left-[calc(61%-var(--reach)/2)] aspect-square w-[var(--reach)] rounded-full border border-primary/30 bg-primary/10 shadow-[0_0_0_18px_color-mix(in_oklch,var(--primary)_4%,transparent),0_0_0_38px_color-mix(in_oklch,var(--primary)_2%,transparent)] transition-all duration-300"
-                aria-hidden="true"
-              />
-              <div
-                className="absolute top-[-8%] left-[58%] h-[112%] w-[5px] origin-center rotate-[-5deg] rounded-full bg-red-600/70 shadow-[0_0_0_1px_rgb(255_255_255_/_0.6)]"
-                aria-hidden="true"
-              />
-              <div
-                className="absolute top-[17%] left-[42%] h-[90%] w-[5px] origin-center rotate-[-28deg] rounded-full bg-blue-600/70 shadow-[0_0_0_1px_rgb(255_255_255_/_0.6)]"
-                aria-hidden="true"
-              />
-              <div
-                className="absolute top-[59%] left-[54%] h-1 w-[38%] origin-center rotate-[8deg] rounded-full bg-green-600/70 shadow-[0_0_0_1px_rgb(255_255_255_/_0.6)]"
-                aria-hidden="true"
-              />
-              <span className="absolute top-[20%] left-[47%] text-[0.6rem] font-medium tracking-widest text-muted-foreground">
-                NORTH SIDE
-              </span>
-              <span className="absolute top-[55%] left-[19%] text-[0.6rem] font-medium tracking-widest text-muted-foreground">
-                WEST SIDE
-              </span>
-              <span className="absolute top-[84%] left-[55%] text-[0.6rem] font-medium tracking-widest text-muted-foreground">
-                SOUTH SIDE
-              </span>
-              <span className="absolute top-[59%] left-[61%] text-[0.6rem] font-medium tracking-widest text-foreground/70">
-                THE LOOP
-              </span>
-              <div
-                className="absolute top-[65%] left-[61%] grid -translate-x-1/2 -translate-y-1/2 place-items-center text-foreground"
-                aria-label="Destination in The Loop"
-              >
-                <MapPin className="size-8 fill-amber-300 drop-shadow-sm" />
-                <span className="absolute left-7 w-max rounded-md bg-card px-2 py-1 text-xs font-medium shadow-sm">
-                  200 W Madison
-                </span>
-              </div>
-              {explorer.results.map((home, index) => (
-                <button
-                  key={home.id}
-                  type="button"
-                  className="absolute grid min-w-10 -translate-x-1/2 -translate-y-1/2 animate-in cursor-pointer place-items-center fade-in slide-in-from-top-2 focus-visible:rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
-                  style={{
-                    left: `${home.x}%`,
-                    top: `${home.y}%`,
-                    animationDelay: `${index * 45}ms`,
-                  }}
-                  onClick={(event) =>
-                    openBuildingDetail(home.id, event.currentTarget)
-                  }
-                  aria-label={`${home.name}, ${home.neighborhood}, $${home.rent} rent, ${home.commute} minute commute`}
-                  aria-pressed={selectedId === home.id}
-                >
-                  <span
-                    className={cn(
-                      "grid size-8 place-items-center rounded-full border-2 border-primary-foreground bg-primary text-primary-foreground shadow-sm transition-transform",
-                      selectedId === home.id &&
-                        "scale-110 ring-4 ring-primary/20",
-                      explorer.winnerId === home.id && "bg-amber-600"
-                    )}
-                  >
-                    {explorer.winnerId === home.id ? (
-                      <Sparkles className="size-4" />
-                    ) : (
-                      <Building2 className="size-4" />
-                    )}
-                  </span>
-                  <small className="mt-1 rounded bg-card px-1 py-0.5 text-[0.65rem] font-medium shadow-sm max-sm:hidden">
-                    ${home.rent}
-                  </small>
-                </button>
-              ))}
-            </div>
+              onGroceryStoreSelect={setSelectedGroceryStore}
+            />
 
             <div
               className="flex min-h-11 flex-wrap items-center gap-x-5 gap-y-2 border-t px-4 py-2 text-xs text-muted-foreground"
