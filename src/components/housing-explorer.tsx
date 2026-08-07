@@ -570,7 +570,7 @@ export function HousingExplorer() {
                         <MessageContent>
                           {message.parts.map((part, index) => {
                             if (part.type === "text") {
-                              const isAnimating =
+                              const isStreaming =
                                 message.role === "assistant" &&
                                 chatStatus === "streaming" &&
                                 message.id === chatMessages.at(-1)?.id
@@ -587,7 +587,7 @@ export function HousingExplorer() {
                                   }
                                 >
                                   <BubbleContent>
-                                    <AgentMarkdown isAnimating={isAnimating}>
+                                    <AgentMarkdown isStreaming={isStreaming}>
                                       {part.text}
                                     </AgentMarkdown>
                                   </BubbleContent>

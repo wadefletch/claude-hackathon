@@ -7,18 +7,17 @@ import { Streamdown } from "streamdown"
  */
 export function AgentMarkdown({
   children,
-  isAnimating = false,
+  isStreaming = false,
 }: {
   children: string
-  isAnimating?: boolean
+  isStreaming?: boolean
 }) {
   return (
     <Streamdown
-      animated={isAnimating}
       className="min-w-0 text-sm leading-6"
-      isAnimating={isAnimating}
-      mode={isAnimating ? "streaming" : "static"}
-      parseIncompleteMarkdown={isAnimating}
+      isAnimating={isStreaming}
+      mode={isStreaming ? "streaming" : "static"}
+      parseIncompleteMarkdown={isStreaming}
     >
       {children}
     </Streamdown>
