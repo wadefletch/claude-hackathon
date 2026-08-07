@@ -293,14 +293,16 @@ export function HousingExplorer() {
       showTransit,
       showGroceryStores: true,
       selectedGroceryStore,
-      isochrone:
-        activeMode === "walk"
-          ? undefined
-          : {
-              origin: workLocation,
-              mode: activeMode === "train" ? "transit" : "drive",
-              minutes: maxMinutes,
-            },
+      isochrone: {
+        origin: workLocation,
+        mode:
+          activeMode === "train"
+            ? "transit"
+            : activeMode === "walk"
+              ? "walk"
+              : "drive",
+        minutes: maxMinutes,
+      },
     }),
     [
       activeMode,
