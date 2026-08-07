@@ -235,14 +235,28 @@ export function HousingExplorer({
     })
   }, [latestAgentWorkLocation])
 
+  // Once the agent has results, they take over the map and Matches list —
+  // the filter-driven explorer.results stays untouched underneath so
+  // switching back is lossless, it's just not what's displayed.
+  const agentMatches = latestShowMapOutput?.matches ?? []
+  const isAgentDriven = agentMatches.length > 0
+
   useEffect(() => {
+    if (isAgentDriven) return
     if (explorer.results.some((home) => home.id === selectedId)) return
 
     const nextSelectedId =
       explorer.winnerId ?? explorer.results.at(0)?.id ?? null
     setSelectedId(nextSelectedId)
     if (!nextSelectedId) setIsDetailOpen(false)
-  }, [explorer])
+  }, [explorer, isAgentDriven])
+
+  // Highlight the agent's top-ranked match whenever a new (or refined) set
+  // of results comes in, so the list/map selection tracks the latest answer.
+  useEffect(() => {
+    if (agentMatches.length === 0) return
+    setSelectedId(agentMatches[0].housing.id)
+  }, [agentMatches])
 
   useEffect(() => {
     const dialog = detailDialogRef.current
@@ -263,6 +277,17 @@ export function HousingExplorer({
     setSelectedId(id)
     setDetailTab("overview")
     setIsDetailOpen(true)
+  }
+
+  // Agent-driven matches don't have the demo review/neighborhood data the
+  // detail dialog is built around, so selecting one just highlights it on
+  // the map and in the list instead of opening that dialog.
+  const handleHomeSelect = (id: string, trigger: HTMLElement) => {
+    if (isAgentDriven) {
+      setSelectedId(id)
+      return
+    }
+    openBuildingDetail(id, trigger)
   }
 
   const closeBuildingDetail = () => {
@@ -293,19 +318,29 @@ export function HousingExplorer({
 
   const ActiveModeIcon = modeIcons[activeMode]
   const selectedHome = explorer.results.find((home) => home.id === selectedId)
-  const mapHomes = useMemo<AppMapHome[]>(
-    () =>
-      explorer.results.map((home) => ({
-        id: home.id,
-        label: `${home.name} · ${home.neighborhood}`,
-        coordinates: home.coordinates,
-        rent: home.rent,
-      })),
-    [explorer.results]
-  )
+  const mapHomes = useMemo<AppMapHome[]>(() => {
+    if (isAgentDriven) {
+      return agentMatches.map((match) => ({
+        id: match.housing.id,
+        label: match.housing.communityArea
+          ? `${match.housing.propertyName} · ${match.housing.communityArea}`
+          : match.housing.propertyName,
+        coordinates: [match.housing.location.lng, match.housing.location.lat],
+        rent: match.rentUsd,
+      }))
+    }
+    return explorer.results.map((home) => ({
+      id: home.id,
+      label: `${home.name} · ${home.neighborhood}`,
+      coordinates: home.coordinates,
+      rent: home.rent,
+    }))
+  }, [agentMatches, isAgentDriven, explorer.results])
   // Aggregate the reachable homes into one bubble per community area (centroid
-  // + count) for the zoomed-out hybrid map view.
+  // + count) for the zoomed-out hybrid map view. Skipped for agent matches —
+  // it's a short curated list, individual pins read better than bubbles.
   const neighborhoodGroups = useMemo(() => {
+    if (isAgentDriven) return []
     const groups = new Map<
       string,
       { sumLng: number; sumLat: number; count: number; homeIds: string[] }
@@ -333,14 +368,16 @@ export function HousingExplorer({
       count: group.count,
       homeIds: group.homeIds,
     }))
-  }, [explorer.results])
+  }, [isAgentDriven, explorer.results])
   const mapState = useMemo<AppMapState>(
     () => ({
       homes: mapHomes,
       neighborhoodGroups,
       work: workLocation,
       selectedHomeId: selectedId,
-      winnerId: explorer.winnerId,
+      winnerId: isAgentDriven
+        ? (agentMatches[0]?.housing.id ?? null)
+        : explorer.winnerId,
       isochrone:
         activeMode === "walk"
           ? undefined
@@ -352,6 +389,8 @@ export function HousingExplorer({
     }),
     [
       activeMode,
+      agentMatches,
+      isAgentDriven,
       explorer.winnerId,
       mapHomes,
       neighborhoodGroups,
@@ -383,13 +422,16 @@ export function HousingExplorer({
         (home) => home.neighborhood === focusedNeighborhood
       )
     : explorer.results
-  const heading = optimizer
-    ? optimizer === "cheapest"
-      ? "Best value match"
-      : "Fastest match"
-    : focusedNeighborhood
-      ? focusedNeighborhood
-      : `${explorer.results.length} reachable ${explorer.results.length === 1 ? "home" : "homes"}`
+  const agentMatchCount = agentMatches.length
+  const heading = isAgentDriven
+    ? `${agentMatchCount} agent ${agentMatchCount === 1 ? "match" : "matches"}`
+    : optimizer
+      ? optimizer === "cheapest"
+        ? "Best value match"
+        : "Fastest match"
+      : focusedNeighborhood
+        ? focusedNeighborhood
+        : `${explorer.results.length} reachable ${explorer.results.length === 1 ? "home" : "homes"}`
 
   return (
     <main className="flex h-svh min-h-svh flex-col overflow-hidden bg-background text-foreground">
@@ -832,7 +874,7 @@ export function HousingExplorer({
                 className="min-h-0 flex-1 rounded-none border-0 shadow-none"
                 state={mapState}
                 onHomeSelect={(home, trigger) =>
-                  openBuildingDetail(home.id, trigger)
+                  handleHomeSelect(home.id, trigger)
                 }
                 onNeighborhoodSelect={setFocusedNeighborhood}
               />
@@ -883,11 +925,99 @@ export function HousingExplorer({
                     )}
                   </h2>
                 </div>
-                <Badge variant="outline">{displayedResults.length}</Badge>
+                <Badge variant="outline">
+                  {isAgentDriven ? agentMatchCount : displayedResults.length}
+                </Badge>
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-                {displayedResults.length ? (
+                {isAgentDriven ? (
+                  agentMatches.map((match, index) => {
+                    const workRoute = match.routes.find(
+                      (route) => route.purpose === "work"
+                    )
+                    return (
+                      <Card
+                        key={match.housing.id}
+                        className={cn(
+                          "shrink-0 cursor-pointer",
+                          selectedId === match.housing.id &&
+                            "ring-2 ring-primary"
+                        )}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={selectedId === match.housing.id}
+                        onClick={(event) =>
+                          handleHomeSelect(match.housing.id, event.currentTarget)
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault()
+                            handleHomeSelect(
+                              match.housing.id,
+                              event.currentTarget
+                            )
+                          }
+                        }}
+                      >
+                        <CardHeader>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <CardDescription className="truncate">
+                                {match.housing.communityArea ??
+                                  match.housing.propertyName}
+                              </CardDescription>
+                              <CardTitle>{match.housing.propertyName}</CardTitle>
+                            </div>
+                            {index === 0 && (
+                              <Badge className="shrink-0">
+                                <Sparkles /> Top match
+                              </Badge>
+                            )}
+                          </div>
+                          <CardDescription>
+                            {match.housing.address}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex flex-col gap-3">
+                          {(match.rentUsd ?? match.bedrooms) !== undefined && (
+                            <dl className="grid grid-cols-2 divide-x">
+                              <div className="pr-3">
+                                <dt className="text-xs text-muted-foreground">
+                                  Monthly rent
+                                </dt>
+                                <dd className="mt-1 font-medium">
+                                  {match.rentUsd
+                                    ? `$${match.rentUsd.toLocaleString()}`
+                                    : "Ask"}
+                                </dd>
+                              </div>
+                              <div className="pl-3">
+                                <dt className="text-xs text-muted-foreground">
+                                  Floor plan
+                                </dt>
+                                <dd className="mt-1 font-medium">
+                                  {match.bedrooms === undefined
+                                    ? "Ask"
+                                    : match.bedrooms === 0
+                                      ? "Studio"
+                                      : `${match.bedrooms} bed`}
+                                </dd>
+                              </div>
+                            </dl>
+                          )}
+                          {workRoute && (
+                            <p className="text-xs text-muted-foreground">
+                              {workRoute.durationMinutes} min by{" "}
+                              {workRoute.mode} to work
+                            </p>
+                          )}
+                          <AgentMarkdown>{match.rationale}</AgentMarkdown>
+                        </CardContent>
+                      </Card>
+                    )
+                  })
+                ) : displayedResults.length ? (
                   displayedResults.map((home) => (
                     <Card
                       key={home.id}
