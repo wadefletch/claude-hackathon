@@ -380,12 +380,22 @@ export function HousingExplorer() {
                 >
                   Travel mode
                 </h3>
+                {/* Controlled by activeMode (not manualMode) so that picking a
+                    "Optimize for" preset, which resolves to a travel mode of
+                    its own, highlights that mode here too. */}
                 <ToggleGroup
                   variant="outline"
                   orientation="vertical"
                   spacing={1}
                   aria-label="Travel mode"
                   className="w-full"
+                  value={[activeMode]}
+                  onValueChange={(value) => {
+                    // Deselecting the active mode yields an empty array; keep
+                    // the current mode rather than leaving nothing selected.
+                    const next = value.at(-1) as TravelMode | undefined
+                    if (next) selectManualMode(next)
+                  }}
                 >
                   {(Object.keys(modes) as TravelMode[]).map((mode) => {
                     const Icon = modeIcons[mode]
@@ -393,10 +403,6 @@ export function HousingExplorer() {
                       <ToggleGroupItem
                         key={mode}
                         value={mode}
-                        pressed={!optimizer && manualMode === mode}
-                        onPressedChange={(pressed) =>
-                          pressed && selectManualMode(mode)
-                        }
                         aria-label={`${modes[mode].label}, $${modes[mode].monthlyCost} monthly travel cost`}
                         className="w-full justify-start"
                       >
