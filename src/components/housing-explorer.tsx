@@ -11,6 +11,7 @@ import {
   DollarSign,
   ExternalLink,
   Footprints,
+  Loader2,
   MapPin,
   Navigation,
   SearchCheck,
@@ -355,7 +356,7 @@ export function HousingExplorer() {
                 defaultValue="filters"
                 className="flex h-full min-h-0 flex-col gap-0"
               >
-                <TabsList className="m-3 shrink-0">
+                <TabsList className="m-3 w-auto shrink-0">
                   <TabsTrigger value="filters">
                     <SlidersHorizontal data-icon="inline-start" /> Filters
                   </TabsTrigger>
@@ -541,15 +542,7 @@ export function HousingExplorer() {
                 <TabsContent
                   value="agent"
                   className="flex min-h-0 flex-1 flex-col"
-                  aria-labelledby="agent-title"
                 >
-                  <p
-                    id="agent-title"
-                    className="shrink-0 px-4 pb-2 text-xs text-muted-foreground"
-                  >
-                    Ask about commute, budget, or eligibility
-                  </p>
-
                   <MessageScrollerProvider autoScroll>
                     <MessageScroller className="flex-1">
                       <MessageScrollerViewport className="border-t">
@@ -680,6 +673,25 @@ export function HousingExplorer() {
                               </Message>
                             </MessageScrollerItem>
                           ))}
+                          {chatStatus === "submitted" && (
+                            <MessageScrollerItem messageId="agent-loading">
+                              <Message>
+                                <MessageContent>
+                                  <Bubble variant="ghost">
+                                    <BubbleContent
+                                      role="status"
+                                      aria-label="Agent is thinking"
+                                    >
+                                      <Loader2
+                                        className="animate-spin"
+                                        aria-hidden="true"
+                                      />
+                                    </BubbleContent>
+                                  </Bubble>
+                                </MessageContent>
+                              </Message>
+                            </MessageScrollerItem>
+                          )}
                           {chatError && (
                             <MessageScrollerItem messageId="agent-error">
                               <Message>
