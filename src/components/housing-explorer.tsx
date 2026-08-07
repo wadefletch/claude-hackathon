@@ -1218,7 +1218,6 @@ export function HousingExplorer() {
               className="min-h-16 resize-none"
               value={chatInput}
               onChange={(event) => setChatInput(event.target.value)}
-              placeholder='Ask for a neighborhood, commute, or say "see if I qualify"…'
               rows={2}
               disabled={chatStatus === "streaming"}
             />
