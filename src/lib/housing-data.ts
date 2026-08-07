@@ -42,7 +42,10 @@ export interface ExplorerResult {
 
 export const destination = "The Loop · 200 W Madison St"
 
-export const MIN_RENT = 800
+// Starts at zero so the slider can be dragged all the way down, even though
+// no listing is that cheap — the bottom of the range reads as "nothing under
+// this price" rather than as a floor imposed by the data.
+export const MIN_RENT = 0
 // Real feed rents run 800 + (h % 12) * 75 (see mockHousingDetail in
 // src/domain/detail.ts), i.e. up to $1,625, so the ceiling brackets that
 // range and the default doesn't silently hide the priciest listings.
