@@ -35,6 +35,7 @@ export function useGeoapifyIsochrone(query?: IsochroneQuery) {
     enabled:
       typeof window !== "undefined" &&
       Boolean(query?.minutes && GEOAPIFY_API_KEY),
+    placeholderData: (previousData) => previousData,
     staleTime: Infinity,
     retry: false,
   })

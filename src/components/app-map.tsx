@@ -1,4 +1,5 @@
-import { useEffect, useId } from "react"
+import { useEffect, useId, useRef, useState } from "react"
+import type { FeatureCollection, Geometry } from "geojson"
 import type { MapLayerMouseEvent } from "maplibre-gl"
 import { Building2, Sparkles } from "lucide-react"
 
@@ -15,6 +16,7 @@ import {
 import { TransitLayers } from "@/components/transit-layers"
 import { useGeoapifyIsochrone } from "@/hooks/use-geoapify-isochrone"
 import type { IsochroneMode } from "@/hooks/use-geoapify-isochrone"
+import { interpolateIsochrone } from "@/lib/isochrone-animation"
 import { cn } from "@/lib/utils"
 
 export type AppMapLocation = {
@@ -60,6 +62,10 @@ export type AppMapProps = {
 
 type GroceryStoreProperties = Omit<GroceryStoreSelection, "coordinates">
 
+type IsochroneData = FeatureCollection<Geometry>
+
+const ISOCHRONE_TRANSITION_DURATION = 350
+
 export function AppMap({
   state,
   onHomeSelect,
@@ -77,16 +83,15 @@ export function AppMap({
     isochrone,
   } = state
   const isochroneOrigin = isochrone?.origin ?? work
-  const { data: isochroneData, isFetching: isIsochroneLoading } =
-    useGeoapifyIsochrone(
-      isochrone
-        ? {
-            coordinates: isochroneOrigin.coordinates,
-            mode: isochrone.mode,
-            minutes: isochrone.minutes,
-          }
-        : undefined
-    )
+  const { data: isochroneData } = useGeoapifyIsochrone(
+    isochrone
+      ? {
+          coordinates: isochroneOrigin.coordinates,
+          mode: isochrone.mode,
+          minutes: isochrone.minutes,
+        }
+      : undefined
+  )
 
   const isochroneColor = isochrone?.mode === "transit" ? "#2563eb" : "#ea580c"
 
@@ -98,22 +103,11 @@ export function AppMap({
       )}
       aria-label={`Map of homes near ${work.label}`}
     >
-      <Map loading={isIsochroneLoading}>
+      <Map>
         <MapControls showCompass showFullscreen />
         {showTransit && <TransitLayers />}
-        {isochroneData && (
-          <MapGeoJSON
-            id="travel-time-isochrone"
-            data={isochroneData}
-            fillPaint={{
-              "fill-color": isochroneColor,
-              "fill-opacity": 0.2,
-            }}
-            linePaint={{
-              "line-color": isochroneColor,
-              "line-width": 2,
-            }}
-          />
+        {isochrone && isochroneData && (
+          <AnimatedIsochroneLayer data={isochroneData} color={isochroneColor} />
         )}
         {homes.map((home) => (
           <HomeMarker
@@ -142,6 +136,62 @@ export function AppMap({
         />
       </Map>
     </section>
+  )
+}
+
+function AnimatedIsochroneLayer({
+  data,
+  color,
+}: {
+  data: IsochroneData
+  color: string
+}) {
+  const [animatedData, setAnimatedData] = useState(data)
+  const animatedDataRef = useRef(data)
+
+  useEffect(() => {
+    if (data === animatedDataRef.current) return
+
+    const from = animatedDataRef.current
+    const startedAt = performance.now()
+    let animationFrame = 0
+
+    const animate = (now: number) => {
+      const progress = Math.min(
+        (now - startedAt) / ISOCHRONE_TRANSITION_DURATION,
+        1
+      )
+      const easedProgress = 1 - Math.pow(1 - progress, 3)
+      const nextData = interpolateIsochrone(from, data, easedProgress)
+
+      animatedDataRef.current = nextData
+      setAnimatedData(nextData)
+
+      if (progress < 1) {
+        animationFrame = window.requestAnimationFrame(animate)
+      } else {
+        animatedDataRef.current = data
+        setAnimatedData(data)
+      }
+    }
+
+    animationFrame = window.requestAnimationFrame(animate)
+    return () => window.cancelAnimationFrame(animationFrame)
+  }, [data])
+
+  return (
+    <MapGeoJSON
+      id="travel-time-isochrone"
+      data={animatedData}
+      fillPaint={{
+        "fill-color": color,
+        "fill-opacity": 0.2,
+      }}
+      linePaint={{
+        "line-color": color,
+        "line-width": 2,
+      }}
+    />
   )
 }
 
