@@ -59,6 +59,8 @@ import {
   destination,
   getManualResults,
   getOptimizedResults,
+  MAX_RENT,
+  MIN_RENT,
   modes,
 } from "@/lib/housing-data"
 import type { Optimizer, TravelMode } from "@/lib/housing-data"
@@ -102,6 +104,7 @@ export function HousingExplorer({
   developments: HousingDevelopment[]
 }) {
   const [maxMinutes, setMaxMinutes] = useState(20)
+  const [maxRent, setMaxRent] = useState(MAX_RENT)
   const [manualMode, setManualMode] = useState<TravelMode>("train")
   const [optimizer, setOptimizer] = useState<Optimizer | null>(null)
   const [workLocation, setWorkLocation] = useState(DEFAULT_WORK_LOCATION)
@@ -128,9 +131,9 @@ export function HousingExplorer({
   const explorer = useMemo(
     () =>
       optimizer
-        ? getOptimizedResults(optimizer, maxMinutes, eligibleHomes)
-        : getManualResults(manualMode, maxMinutes, eligibleHomes),
-    [manualMode, maxMinutes, optimizer, eligibleHomes]
+        ? getOptimizedResults(optimizer, maxMinutes, maxRent, eligibleHomes)
+        : getManualResults(manualMode, maxMinutes, maxRent, eligibleHomes),
+    [manualMode, maxMinutes, maxRent, optimizer, eligibleHomes]
   )
   const activeMode = explorer.mode
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -521,6 +524,40 @@ export function HousingExplorer({
                     >
                       <span>15 min</span>
                       <span>60 min</span>
+                    </div>
+                  </section>
+
+                  <Separator />
+
+                  <section className="py-4" aria-labelledby="rent-label">
+                    <div className="mb-3 flex items-center justify-between gap-4 text-sm font-medium">
+                      <span
+                        id="rent-label"
+                        className="inline-flex items-center gap-2"
+                      >
+                        <DollarSign className="size-4 text-muted-foreground" />{" "}
+                        Maximum rent
+                      </span>
+                      <output className="tabular-nums" aria-live="polite">
+                        ${maxRent.toLocaleString()}/mo
+                      </output>
+                    </div>
+                    <Slider
+                      aria-label="Maximum monthly rent in dollars"
+                      min={MIN_RENT}
+                      max={MAX_RENT}
+                      step={25}
+                      value={[maxRent]}
+                      onValueChange={(value) =>
+                        setMaxRent(Array.isArray(value) ? value[0] : value)
+                      }
+                    />
+                    <div
+                      className="mt-2 flex justify-between text-xs text-muted-foreground"
+                      aria-hidden="true"
+                    >
+                      <span>${MIN_RENT.toLocaleString()}</span>
+                      <span>${MAX_RENT.toLocaleString()}</span>
                     </div>
                   </section>
 
@@ -1087,7 +1124,8 @@ export function HousingExplorer({
                       </EmptyMedia>
                       <EmptyTitle>No homes in range</EmptyTitle>
                       <EmptyDescription>
-                        Increase your commute time or try a faster travel mode.
+                        Increase your commute time, raise your rent limit, or
+                        try a faster travel mode.
                       </EmptyDescription>
                     </EmptyHeader>
                   </Empty>
