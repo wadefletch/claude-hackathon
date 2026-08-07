@@ -48,6 +48,13 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupText,
+  InputGroupTextarea,
+} from "@/components/ui/input-group"
 import { Label } from "@/components/ui/label"
 import { Message, MessageContent, MessageFooter } from "@/components/ui/message"
 import {
@@ -66,7 +73,6 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Slider } from "@/components/ui/slider"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
 import { Toggle } from "@/components/ui/toggle"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
@@ -546,9 +552,9 @@ export function HousingExplorer() {
 
                   <MessageScrollerProvider autoScroll>
                     <MessageScroller className="flex-1">
-                      <MessageScrollerViewport>
+                      <MessageScrollerViewport className="border-t">
                         <MessageScrollerContent
-                          className="gap-4 px-4 pb-4"
+                          className="gap-4 p-4"
                           aria-busy={chatStatus === "streaming"}
                         >
                           {chatMessages.length === 0 && (
@@ -695,7 +701,7 @@ export function HousingExplorer() {
                   </MessageScrollerProvider>
 
                   <form
-                    className="grid shrink-0 grid-cols-[1fr_auto] gap-2 border-t p-3"
+                    className="shrink-0 p-3"
                     onSubmit={(event) => {
                       event.preventDefault()
                       submitChatMessage()
@@ -704,28 +710,40 @@ export function HousingExplorer() {
                     <Label htmlFor="agent-message" className="sr-only">
                       Message the housing agent
                     </Label>
-                    <Textarea
-                      id="agent-message"
-                      className="min-h-16 resize-none"
-                      value={chatInput}
-                      onChange={(event) => setChatInput(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" && !event.shiftKey) {
-                          event.preventDefault()
-                          submitChatMessage()
-                        }
-                      }}
-                      placeholder="Message the housing agent"
-                      rows={2}
-                      disabled={isChatBusy}
-                    />
-                    <Button
-                      className="h-16"
-                      type="submit"
-                      disabled={isChatBusy || !chatInput.trim()}
-                    >
-                      <Send data-icon="inline-start" /> Send
-                    </Button>
+                    <InputGroup>
+                      <InputGroupTextarea
+                        id="agent-message"
+                        className="min-h-16"
+                        value={chatInput}
+                        onChange={(event) => setChatInput(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && !event.shiftKey) {
+                            event.preventDefault()
+                            submitChatMessage()
+                          }
+                        }}
+                        placeholder="Message the housing agent"
+                        rows={2}
+                        disabled={isChatBusy}
+                      />
+                      <InputGroupAddon
+                        align="block-end"
+                        className="justify-between"
+                      >
+                        <InputGroupText>
+                          Shift + Enter for a new line
+                        </InputGroupText>
+                        <InputGroupButton
+                          type="submit"
+                          variant="default"
+                          size="icon-sm"
+                          disabled={isChatBusy || !chatInput.trim()}
+                          aria-label="Send message"
+                        >
+                          <Send />
+                        </InputGroupButton>
+                      </InputGroupAddon>
+                    </InputGroup>
                   </form>
                 </TabsContent>
               </Tabs>
