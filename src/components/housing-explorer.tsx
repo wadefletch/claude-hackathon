@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useChat } from "@ai-sdk/react"
 import { useNavigate } from "@tanstack/react-router"
-import { Streamdown } from "streamdown"
+import { defaultRemarkPlugins, Streamdown } from "streamdown"
 import {
   Bot,
   Building2,
@@ -46,13 +46,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupText,
-  InputGroupTextarea,
-} from "@/components/ui/input-group"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Message, MessageContent, MessageFooter } from "@/components/ui/message"
@@ -114,6 +107,8 @@ const DEFAULT_WORK_LOCATION = {
 const MIN_COMMUTE_MINUTES = 15
 const MAX_COMMUTE_MINUTES = 90
 
+const GFM_REMARK_PLUGINS = Object.values(defaultRemarkPlugins)
+
 // The agent's TransportMode is a superset of this demo's TravelMode (no
 // "bike" here, so it falls back to "walk" as the closest non-motorized mode).
 const AGENT_MODE_TO_TRAVEL_MODE: Record<TransportMode, TravelMode> = {
@@ -122,6 +117,63 @@ const AGENT_MODE_TO_TRAVEL_MODE: Record<TransportMode, TravelMode> = {
   walk: "walk",
   bike: "walk",
   rideshare: "rideshare",
+}
+
+function SmoothStreamdown({ text, active }: { text: string; active: boolean }) {
+  const [visibleText, setVisibleText] = useState(active ? "" : text)
+  const visibleTextRef = useRef(active ? "" : text)
+  const hasStreamedRef = useRef(active)
+
+  useEffect(() => {
+    if (active) hasStreamedRef.current = true
+
+    if (
+      !hasStreamedRef.current ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      visibleTextRef.current = text
+      setVisibleText(text)
+      return
+    }
+
+    // Model output should only grow. If the provider replaces earlier text,
+    // show the corrected value immediately instead of visibly rewinding it.
+    if (!text.startsWith(visibleTextRef.current)) {
+      visibleTextRef.current = text
+      setVisibleText(text)
+      return
+    }
+
+    const remaining = text.length - visibleTextRef.current.length
+    if (remaining <= 0) return
+
+    // Spread each incoming provider chunk over several display frames. This
+    // keeps the reveal finer than the network chunks without animating each
+    // Markdown block independently.
+    const charactersPerFrame = Math.max(1, Math.ceil(remaining / 8))
+    let animationFrame: number
+
+    const revealNextCharacters = () => {
+      const nextLength = Math.min(
+        text.length,
+        visibleTextRef.current.length + charactersPerFrame
+      )
+      const nextText = text.slice(0, nextLength)
+      visibleTextRef.current = nextText
+      setVisibleText(nextText)
+
+      if (nextLength < text.length) {
+        animationFrame = requestAnimationFrame(revealNextCharacters)
+      }
+    }
+
+    animationFrame = requestAnimationFrame(revealNextCharacters)
+    return () => cancelAnimationFrame(animationFrame)
+  }, [active, text])
+
+  return (
+    <Streamdown remarkPlugins={GFM_REMARK_PLUGINS}>{visibleText}</Streamdown>
+  )
 }
 
 export function HousingExplorer({
@@ -188,6 +240,11 @@ export function HousingExplorer({
   } = useChat()
   const [chatInput, setChatInput] = useState("")
   const isChatBusy = chatStatus === "submitted" || chatStatus === "streaming"
+  const latestMessage = chatMessages.at(-1)
+  const streamingMessageId =
+    chatStatus === "streaming" && latestMessage?.role === "assistant"
+      ? latestMessage.id
+      : undefined
 
   // Agent-produced app/map state lives in the URL (query params), not just
   // in this component's memory, so a reload/back-forward preserves it and
@@ -816,9 +873,13 @@ export function HousingExplorer({
                                         >
                                           <BubbleContent>
                                             {message.role === "assistant" ? (
-                                              <Streamdown>
-                                                {part.text}
-                                              </Streamdown>
+                                              <SmoothStreamdown
+                                                active={
+                                                  message.id ===
+                                                  streamingMessageId
+                                                }
+                                                text={part.text}
+                                              />
                                             ) : (
                                               part.text
                                             )}
@@ -866,7 +927,11 @@ export function HousingExplorer({
                                                     </p>
                                                   )}
                                                   <div className="mt-2">
-                                                    <Streamdown>
+                                                    <Streamdown
+                                                      remarkPlugins={
+                                                        GFM_REMARK_PLUGINS
+                                                      }
+                                                    >
                                                       {match.rationale}
                                                     </Streamdown>
                                                   </div>
@@ -923,7 +988,7 @@ export function HousingExplorer({
                   </MessageScrollerProvider>
 
                   <form
-                    className="shrink-0 p-3"
+                    className="flex shrink-0 items-center gap-2 p-3"
                     onSubmit={(event) => {
                       event.preventDefault()
                       submitChatMessage()
@@ -932,40 +997,21 @@ export function HousingExplorer({
                     <Label htmlFor="agent-message" className="sr-only">
                       Message the housing agent
                     </Label>
-                    <InputGroup>
-                      <InputGroupTextarea
-                        id="agent-message"
-                        className="min-h-16"
-                        value={chatInput}
-                        onChange={(event) => setChatInput(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" && !event.shiftKey) {
-                            event.preventDefault()
-                            submitChatMessage()
-                          }
-                        }}
-                        placeholder="Message the housing agent"
-                        rows={2}
-                        disabled={isChatBusy}
-                      />
-                      <InputGroupAddon
-                        align="block-end"
-                        className="justify-between"
-                      >
-                        <InputGroupText>
-                          Shift + Enter for a new line
-                        </InputGroupText>
-                        <InputGroupButton
-                          type="submit"
-                          variant="default"
-                          size="icon-sm"
-                          disabled={isChatBusy || !chatInput.trim()}
-                          aria-label="Send message"
-                        >
-                          <Send />
-                        </InputGroupButton>
-                      </InputGroupAddon>
-                    </InputGroup>
+                    <Input
+                      id="agent-message"
+                      value={chatInput}
+                      onChange={(event) => setChatInput(event.target.value)}
+                      placeholder="Message the housing agent"
+                      disabled={isChatBusy}
+                    />
+                    <Button
+                      type="submit"
+                      size="icon"
+                      disabled={isChatBusy || !chatInput.trim()}
+                      aria-label="Send message"
+                    >
+                      <Send />
+                    </Button>
                   </form>
                 </TabsContent>
               </Tabs>
@@ -1168,7 +1214,9 @@ export function HousingExplorer({
                               {workRoute.mode} to work
                             </p>
                           )}
-                          <Streamdown>{match.rationale}</Streamdown>
+                          <Streamdown remarkPlugins={GFM_REMARK_PLUGINS}>
+                            {match.rationale}
+                          </Streamdown>
                         </CardContent>
                       </Card>
                     )
